@@ -67,11 +67,12 @@ def main():
     combo_hold = SimpleNamespace(name="combo", buttons=["L1", "R1"], presses=1, hold=True)
     ps_hold = SimpleNamespace(name="ps", buttons=["PS"], presses=1, hold=True)
     held.set_shortcuts([combo_hold, ps_hold])
-    for state in [{"L1"}, {"L1", "R1"}, {"L1"}, {"L1", "R1"}, {"L1"}, {"L1", "R1"}, {"R1"}, set()]:
+    for state in [{"L1"}, {"L1", "R1"}, {"L1"}, {"L1", "R1"}, {"L1"}, {"L1", "Right"}, {"L1"},
+                  {"L1", "R1"}, {"R1"}, set()]:
         held.update(frozenset(state))
     time.sleep(0.1)
-    assert phases == [("combo", "start"), ("combo", "repeat"), ("combo", "repeat"),
-                      ("combo", "end")], phases
+    assert phases == [("combo", "start"), ("combo", "repeat"), ("combo", "press:Right"),
+                      ("combo", "repeat"), ("combo", "end")], phases
 
     # a one-button held shortcut ends a moment after the last press
     phases.clear()

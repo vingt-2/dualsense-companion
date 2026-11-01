@@ -13,6 +13,7 @@ user32 = ctypes.WinDLL("user32", use_last_error=True)
 
 VK_TAB = 0x09
 VK_MENU = 0x12   # Alt
+VK_LEFT, VK_UP, VK_RIGHT, VK_DOWN = 0x25, 0x26, 0x27, 0x28
 
 
 class _KeybdInput(ctypes.Structure):

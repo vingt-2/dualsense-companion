@@ -289,6 +289,8 @@ class TrayApp:
                 raise ActionError(f"Unknown action {shortcut.action!r}; is DualSense Bridge up to date?")
             if phase == "repeat":
                 return action.repeat(shortcut.params)
+            if phase.startswith("press:"):
+                return action.press(shortcut.params, phase[len("press:"):])
             if phase == "end":
                 return action.end(shortcut.params)
             message = action.run(shortcut.params)

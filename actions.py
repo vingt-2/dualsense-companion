@@ -42,6 +42,9 @@ class Action:
     def end(self, params):
         """Held actions: the shortcut was let go."""
 
+    def press(self, params, button):
+        """Held actions: another button was pressed while the shortcut is held."""
+
 
 def _tick_list(parent, rows, params, key, all_text):
     """Checkboxes for rows [(id, name, label)], under an "all connected" box that, when
@@ -259,6 +262,13 @@ class WindowSwitcher(Action):
 
     def repeat(self, params):
         keyboard.press(keyboard.VK_TAB)
+
+    ARROWS = {"Left": keyboard.VK_LEFT, "Right": keyboard.VK_RIGHT,
+              "Up": keyboard.VK_UP, "Down": keyboard.VK_DOWN}
+
+    def press(self, params, button):
+        if button in self.ARROWS:      # the d-pad moves through the switcher
+            keyboard.press(self.ARROWS[button])
 
     def end(self, params):
         keyboard.key_up(keyboard.VK_MENU)

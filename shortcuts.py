@@ -12,7 +12,8 @@ Some actions are held, like Alt while Alt+Tab-ing through windows (shortcut.hold
 the shortcut fires ("start"), each further press of its buttons fires "repeat" (whatever its
 press count), and "end" comes once its buttons are let go. So with L1 + R1 you hold L1, tap
 R1, and let go of L1 to finish. A one-button shortcut has nothing to hold, so it ends
-HOLD_IDLE after the last press instead.
+HOLD_IDLE after the last press instead. Other buttons pressed meanwhile are handed to the
+action ("press:<button>"), e.g. the d-pad to pick a window.
 
 Games still see the buttons, so combinations a game doesn't use (or PS pressed several
 times) work best.
@@ -195,6 +196,10 @@ class ShortcutEngine:
     # -- held shortcuts -----------------------------------------------------------
     def _session_update(self, prev, held):
         shortcut, combo, _ = self._session
+        for button in sorted((held - prev) - combo, key=BUTTONS.index):
+            self._jobs.put((shortcut, f"press:{button}"))
+            if not combo & held:                    # one-button shortcut: give time to pick
+                self._arm_session_timer(HOLD_IDLE)
         if combo <= held and not combo <= prev:
             self._fire(shortcut, "repeat")
             self._arm_session_timer(HOLD_MAX)
