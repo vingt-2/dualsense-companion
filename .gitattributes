@@ -1,0 +1,4 @@
+# RE Engine game files (e.g. button icon textures): never convert line endings
+*.x64 binary
+*.tex.* binary
+*.png binary

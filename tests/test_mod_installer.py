@@ -58,13 +58,15 @@ def main():
     assert done[0] == "REFramework already installed" and not any(u.endswith(".zip") for u in downloads)
     assert open(os.path.join(folder, "dinput8.dll"), "rb").read() == b"someone else's"
 
-    # an existing REFramework setup keeps its own settings
+    # an existing REFramework setup gets its window hidden too, and keeps its other settings
+    with open(os.path.join(folder, "re2_fw_config.txt"), "w") as f:
+        f.write("REFrameworkConfig_RememberMenuState=false\nREFrameworkConfig_MenuOpen=true\nOther=1\n")
+    mod_installer.install(GAME, folder, get=get, reframework=reframework, log=lambda s: None)
+    assert open(os.path.join(folder, "re2_fw_config.txt")).read().splitlines() == [
+        "REFrameworkConfig_RememberMenuState=true", "REFrameworkConfig_MenuOpen=false", "Other=1"]
+    # set_config keeps other lines, replaces the keys it sets and appends missing ones
     with open(os.path.join(folder, "re2_fw_config.txt"), "w") as f:
         f.write("REFrameworkConfig_RememberMenuState=false\nOther=1\n")
-    mod_installer.install(GAME, folder, get=get, reframework=reframework, log=lambda s: None)
-    assert open(os.path.join(folder, "re2_fw_config.txt")).read().startswith(
-        "REFrameworkConfig_RememberMenuState=false")
-    # set_config keeps other lines and replaces the keys it sets
     mod_installer.set_config(os.path.join(folder, "re2_fw_config.txt"), mod_installer.QUIET_MENU)
     lines = open(os.path.join(folder, "re2_fw_config.txt")).read().splitlines()
     assert lines == ["REFrameworkConfig_RememberMenuState=true", "Other=1",
@@ -86,7 +88,7 @@ def main():
     os.makedirs(os.path.join(fresh, "DualSenseBridge-backup", "x"))
     open(os.path.join(fresh, "DualSenseBridge-backup", "x", "old.lua"), "w").close()
     done = mod_installer.uninstall(GAME, fresh, log=lambda s: None)
-    assert done == ["removed the adaptive-trigger script",
+    assert done == ["removed the mod",
                     "removed REFramework (DualSense Bridge had installed it)"], done
     assert sorted(os.listdir(fresh)) == ["DualSenseBridge-backup"], os.listdir(fresh)
 
@@ -104,7 +106,7 @@ def main():
     open(os.path.join(fresh, "dinput8.dll"), "wb").write(b"theirs")
     mod_installer.install(GAME, fresh, get=get, reframework=reframework, log=lambda s: None)
     done = mod_installer.uninstall(GAME, fresh, log=lambda s: None)
-    assert done == ["removed the adaptive-trigger script"], done
+    assert done == ["removed the mod"], done
     assert open(os.path.join(fresh, "dinput8.dll"), "rb").read() == b"theirs"
 
     # the REFramework build follows the installed Steam branch
@@ -132,6 +134,25 @@ def main():
     assert mod_installer.reframework_source(entry, game_dir)[1] == "REFramework.zip"
     # the real RE7 on this kind of PC (no BetaKey) and a folder outside Steam
     assert mod_installer.steam_branch(tempfile.mkdtemp(), 418370) is None
+
+    # a mod with loose files (RE7's PlayStation icons): the loader is turned on, and uninstall
+    # removes the files and the folders they leave empty, nothing else
+    re7 = next(g for g in game_mods.GAMES if g["exe"] == "re7.exe")
+    def reframework7(asset, repo="praydog/REFramework"):
+        return "v9", "https://example.invalid/RE7.zip"
+    def get7(url):
+        return fake_zip() if url.endswith(".zip") else b"file:" + url.encode()
+    fresh = tempfile.mkdtemp()
+    os.makedirs(os.path.join(fresh, "natives", "stm", "other"))
+    open(os.path.join(fresh, "natives", "stm", "other", "keep.tex"), "w").close()
+    mod_installer.install(re7, fresh, get=get7, reframework=reframework7, log=lambda s: None)
+    icon = os.path.join(fresh, "natives", "stm", "ui", "ui0000", "tex", "ui0010_iam.tex.35.x64")
+    assert open(icon, "rb").read().endswith(b"/mods/re7/icons/natives/stm/ui/ui0000/tex/ui0010_iam.tex.35.x64")
+    config = open(os.path.join(fresh, "re2_fw_config.txt")).read()
+    assert "LooseFileLoader_Enabled=true" in config, config
+    mod_installer.uninstall(re7, fresh, log=lambda s: None)
+    assert not os.path.exists(os.path.join(fresh, "natives", "stm", "ui"))
+    assert os.path.exists(os.path.join(fresh, "natives", "stm", "other", "keep.tex"))
 
     # Steam: the app manifest says where the game is
     lib = tempfile.mkdtemp()

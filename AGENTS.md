@@ -19,6 +19,10 @@ and the conventions that matter when changing the project.
   `%LOCALAPPDATA%\DualSenseBridge\bridge.log` afterwards: a crash at startup shows there.
 - User-facing text calls the feature **"Game mods"**. Don't name DualSenseX/DSX in feature names
   or menus; it's fine in code, credits and one compatibility line in the README.
+- **REFramework's window stays hidden by default** for anyone who installs a mod through the
+  bridge (Insert still opens it): every install and update sets `RememberMenuState=true` and
+  `MenuOpen=false` in its config, even when REFramework was already there. People install these
+  for the mod, not to see REFramework. Keep it that way for every new game.
 
 ## Game mods: how it fits together
 
@@ -76,8 +80,8 @@ changes; you only write a mod for games that have none, or whose mod is broken.
    branch from the Steam app manifest's `BetaKey`), `files`
    (`{path in game folder: raw.githubusercontent URL on main}`) and `conflicts` (other mods'
    files to move aside). `mod_installer.install` assumes an REFramework game (it installs
-   `dinput8.dll` only when missing, then sets REFramework to keep its menu closed and leaves a
-   marker; uninstall removes REFramework only with that marker and no other REFramework mods); a
+   `dinput8.dll` only when missing and then leaves a marker; every install and update sets
+   REFramework to keep its window hidden, see above; uninstall removes REFramework only with that marker and no other REFramework mods); a
    game with another loader needs a new branch there.
 4. **Write the mod's README** (`mods/<game>/README.md`): what it does, "The quick way" (tray ->
    *Game mods* -> *<game>* -> *Install adaptive triggers…*), "By hand" steps a non-modder can follow,
@@ -111,6 +115,18 @@ changes; you only write a mod for games that have none, or whose mod is broken.
   Not a Hero has its own inventory (`app.CH8Inventory`) and item IDs; main-game items can't be
   equipped there. The probe used is kept outside git (`build/probes/`); its approach (read fields
   as well as getters, start from known objects, log scan errors) is what worked.
+
+## PlayStation button prompts
+
+RE7, Village, RE2 and RE3 show only Xbox prompts on PC and only read XInput (with Steam Input
+off, RE7 sees no controller at all), so the game can't be made to pick its own PlayStation icons.
+Instead each game's mod ships its icon atlas with the Xbox cells replaced by PS5 icons, loaded as
+a loose file (`"loose_files": True` in `game_mods.py` turns on REFramework's loose file loader on
+install; the tray asks for the game to be closed, because the game rewrites REFramework's config
+on exit). The owner chose to ship them as part of each game's mod (no separate option: nobody
+playing on a DualSense wants Xbox prompts) and to keep the icons in the repo. How to find a
+game's atlas, map its cells and build it: `tools/ps-icons/README.md`. RE7's atlas:
+`natives/stm/ui/ui0000/tex/ui0010_iam.tex.35.x64` (and an identical `ui0020`), checked in game.
 
 ## Hidden options
 

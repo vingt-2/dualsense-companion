@@ -139,6 +139,7 @@ def set_config(path, values):
     _write(path, ("\n".join(lines) + "\n").encode("utf-8"))
 
 
+LOOSE_FILES = {"LooseFileLoader_Enabled": "true"}
 REFRAMEWORK_MARKER = "installed-reframework.txt"   # in the mod's data folder
 # what REFramework itself leaves next to the exe (removed only if we installed it)
 REFRAMEWORK_FILES = ["dinput8.dll", REFRAMEWORK_CONFIG, "re2_framework_log.txt",
@@ -160,7 +161,6 @@ def install(game, folder, get=_get, reframework=latest_reframework, log=print):
             if not name:
                 raise RuntimeError(f"{asset} has no dinput8.dll")
             _write(loader, z.read(name))
-        set_config(os.path.join(folder, REFRAMEWORK_CONFIG), QUIET_MENU)
         # remember that REFramework came from us, so uninstalling may take it away again
         _write(os.path.join(folder, game["data"], REFRAMEWORK_MARKER), f"{tag}\n".encode())
         done.append(f"installed REFramework {tag}")
@@ -180,16 +180,37 @@ def install(game, folder, get=_get, reframework=latest_reframework, log=print):
         log(f"[mods] moved {', '.join(moved)} to {backup}")
         done.append(f"moved the other trigger mod to {os.path.relpath(backup, folder)}")
 
+    # REFramework's window stays hidden by default (Insert opens it), on every install and
+    # update, whether we installed REFramework or it was there already: people install this
+    # for the mod, not to look at REFramework. Mods with loose files (button icons under
+    # natives\) also need its loose file loader.
+    settings = dict(QUIET_MENU)
+    if game.get("loose_files"):
+        settings.update(LOOSE_FILES)
+    set_config(os.path.join(folder, REFRAMEWORK_CONFIG), settings)
     for rel, url in game["files"].items():
         data = get(url)
         if not data.strip():
             raise RuntimeError(f"empty download: {url}")
         _write(os.path.join(folder, rel), data)
-    done.append("installed the adaptive-trigger script")
+    done.append("installed the mod")
     log(f"[mods] {game['name']}: " + "; ".join(done))
     return done
 
 
+
+
+def _remove_empty_parents(path, stop):
+    """Remove the folders above path that are now empty, up to (not including) stop."""
+    stop = os.path.abspath(stop)
+    parent = os.path.dirname(os.path.abspath(path))
+    while (os.path.normcase(parent) != os.path.normcase(stop)
+           and os.path.normcase(os.path.commonpath([parent, stop])) == os.path.normcase(stop)):
+        try:
+            os.rmdir(parent)              # only succeeds on an empty folder
+        except OSError:
+            return
+        parent = os.path.dirname(parent)
 
 
 def _files_under(path):
@@ -226,8 +247,9 @@ def uninstall(game, folder, log=print):
         path = os.path.join(folder, rel)
         if os.path.exists(path):
             os.remove(path)
+        _remove_empty_parents(path, folder)
     shutil.rmtree(os.path.join(folder, game["data"]), ignore_errors=True)
-    done.append("removed the adaptive-trigger script")
+    done.append("removed the mod")
     if remove_loader:
         for name in REFRAMEWORK_FILES[1:]:
             try:

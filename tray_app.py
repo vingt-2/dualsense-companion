@@ -358,6 +358,18 @@ class TrayApp:
             pystray.MenuItem("Setup guide…", lambda: webbrowser.open(game["guide"])),
         ))]
 
+    def _game_closed(self, game):
+        """Mods with loose files change REFramework's settings, which the game rewrites when it
+        exits: ask for the game to be closed first. True when it's closed (or doesn't matter)."""
+        if not game.get("loose_files"):
+            return True
+        while any(name.lower() == game["exe"] for name in dsx.list_processes().values()):
+            if _ask(f"Please close {game['name']} first: the mod changes a setting the game "
+                    "overwrites when it exits.\n\nClose the game, then choose Retry.",
+                    0x05) != 4:                       # Retry / Cancel
+                return False
+        return True
+
     def _uninstall_mod_flow(self, game):
         try:
             folder = self.game_folders.get(game["exe"])
@@ -372,6 +384,8 @@ class TrayApp:
             else:
                 loader = ("  •  REFramework, the mod loader, is removed too: DualSense Bridge "
                           "installed it and nothing else uses it (close the game first)\n")
+            if not self._game_closed(game):
+                return
             if _ask(f"Uninstall adaptive triggers from {game['name']}?\n\n"
                     f"From {folder}:\n"
                     "  •  the trigger script and its settings are removed\n"
@@ -432,12 +446,14 @@ class TrayApp:
                 "  •  REFramework, the mod loader (from github.com/praydog/REFramework), "
                 "if it isn't installed yet\n"
                 "  •  DualSense Bridge's trigger script (from github.com/vingt-2/dualsense-bridge)\n"
+                + ("  •  PlayStation button icons for the game's prompts, and REFramework's "
+                   "loose file loader turned on to load them\n" if game.get("loose_files") else "") +
                 "  •  another adaptive-trigger mod, if there is one, is moved into "
                 "DualSenseBridge-backup, not deleted\n\n"
                 "Yes: go ahead.     No: open the step-by-step guide instead.", 0x03)
             if answer == 7:
                 webbrowser.open(game["guide"])
-            if answer != 6:
+            if answer != 6 or not self._game_closed(game):
                 return
             done = mod_installer.install(game, folder)
             self.game_folders[game["exe"]] = folder

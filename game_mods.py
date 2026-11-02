@@ -70,15 +70,25 @@ GAMES = [
             "only lets the game see the trigger once it's past the wall, so the shot fires at "
             "the break. An empty gun gets a light click instead. In menus and cutscenes the "
             "triggers go back to normal.\n\n"
-            "The mod only reads the game, it doesn't change it. To remove it, delete "
-            "reframework\\autorun\\dualsense_bridge_re7.lua in the game folder."),
+            "•  The game's button prompts show PlayStation buttons (✕ ○ □ △, L1, R2, "
+            "Options…) instead of Xbox ones. They're loose files that replace the game's "
+            "button icons; REFramework loads them.\n\n"
+            "The mod doesn't change the game's own files. Uninstall removes it again."),
         "steam_appid": 418370,
         # stable works with RE7's current (ray-traced) build: checked 2026-11-01
         "reframework": {"repo": "praydog/REFramework", "asset": "RE7.zip"},
         "reframework_branches": {
             "dx11_non-rt": {"repo": "praydog/REFramework", "asset": "RE7_TDB49.zip"}},
-        "files": {r"reframework\autorun\dualsense_bridge_re7.lua":
-                  f"{RAW}/mods/re7/reframework/autorun/dualsense_bridge_re7.lua"},
+        "files": {
+            r"reframework\autorun\dualsense_bridge_re7.lua":
+                f"{RAW}/mods/re7/reframework/autorun/dualsense_bridge_re7.lua",
+            # PlayStation button icons (tools/ps-icons builds them)
+            r"natives\stm\ui\ui0000\tex\ui0010_iam.tex.35.x64":
+                f"{RAW}/mods/re7/icons/natives/stm/ui/ui0000/tex/ui0010_iam.tex.35.x64",
+            r"natives\stm\ui\ui0000\tex\ui0020_iam.tex.35.x64":
+                f"{RAW}/mods/re7/icons/natives/stm/ui/ui0000/tex/ui0020_iam.tex.35.x64",
+        },
+        "loose_files": True,      # REFramework must load files from natives\ (the icons)
         "conflicts": [],
     },
 ]
