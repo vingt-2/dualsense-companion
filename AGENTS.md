@@ -66,13 +66,17 @@ changes; you only write a mod for games that have none, or whose mod is broken.
      can be diagnosed from outside the game without asking the user to read menus.
 2. **Register the payload path** in `dsx.PAYLOAD_PATHS` (relative to the game exe's folder).
 3. **Add the game to `game_mods.GAMES`**: `exe`, `name`, `installed` (files that mean the mod is
-   there), `guide` (URL of the mod's README), and for the one-click install `steam_appid`,
+   there), `data` (the mod's own data folder, removed on uninstall; the installer also keeps its
+   "we installed REFramework" marker there), `guide` (URL of the mod's README), `about` (a plain-language "how it works" for the
+   tray's per-game submenu; no jargon), and for the one-click install `steam_appid`,
    `reframework_asset` (the zip name in praydog/REFramework's latest release), `files`
    (`{path in game folder: raw.githubusercontent URL on main}`) and `conflicts` (other mods'
    files to move aside). `mod_installer.install` assumes an REFramework game (it installs
-   `dinput8.dll` only when missing); a game with another loader needs a new branch there.
+   `dinput8.dll` only when missing, then sets REFramework to keep its menu closed and leaves a
+   marker; uninstall removes REFramework only with that marker and no other REFramework mods); a
+   game with another loader needs a new branch there.
 4. **Write the mod's README** (`mods/<game>/README.md`): what it does, "The quick way" (tray ->
-   *Game mods* -> *Install adaptive triggers for ...*), "By hand" steps a non-modder can follow,
+   *Game mods* -> *<game>* -> *Install adaptive triggers…*), "By hand" steps a non-modder can follow,
    troubleshooting, tuning, credits.
 5. **Tests**, and add each new test script to `build.ps1` (the build runs them all):
    - extend `tests/test_dsx.py` / `tests/test_mod_installer.py` / `tests/test_tray_menu.py`;
@@ -96,6 +100,13 @@ changes; you only write a mod for games that have none, or whose mod is broken.
   `get_EquipWeaponID()`. Loaded ammo: `chainsaw.InventoryManager._ControllerTable` values ->
   the `chainsaw.CsInventoryController` -> `getEquippedWeapon()` -> `get_CurrentAmmoCount()`.
   Weapon IDs -> classes: the table in the script (from Advanced Weapon Framework's data).
+
+## Hidden options
+
+- **Haptics delay** (the controller's haptics buffer depth) has a tray submenu that is hidden
+  since 1.7.0, because the default held up in every game the owner played. It's still in
+  `tray_app.py`: set `SHOW_HAPTICS_DELAY = True` to show it again. A `haptics_depth` in
+  `settings.json` is applied either way. Bring it back if users report stuttering haptics.
 
 ## Pitfalls we hit (don't repeat them)
 

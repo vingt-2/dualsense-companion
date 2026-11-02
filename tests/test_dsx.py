@@ -314,6 +314,21 @@ def test_payload_file():
     w.scan()
     assert w._folders == {game: dsx.PAYLOAD_PATHS, r"C:\Elsewhere": []}, w._folders
 
+    # a mod installed between two runs of the game: the next run is watched
+    fresh = tempfile.mkdtemp()
+    procs = {90: "re4.exe"}
+    started = []
+    w = dsx.PayloadWatcher(dsx.Overrides(), processes=lambda: procs,
+                           path_of=lambda pid: os.path.join(fresh, "re4.exe"),
+                           alive=lambda pid: False)
+    w.watch = lambda *a: started.append(a)
+    w.scan()
+    assert not started                              # no reframework folder yet: nothing to watch
+    os.makedirs(os.path.join(fresh, "reframework", "autorun"))
+    procs.clear(); procs[91] = "re4.exe"            # the game restarted after the install
+    w.scan()
+    assert started and started[0][0] == fresh, started
+
     # two mods' files in one game: both are followed
     ours = os.path.join(game, "reframework", "data", "DualSenseBridge")
     os.makedirs(ours)

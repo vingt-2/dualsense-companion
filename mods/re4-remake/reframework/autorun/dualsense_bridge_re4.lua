@@ -165,24 +165,50 @@ local function player_equipment()
         or "no player object"
 end
 
--- Loaded rounds: the case inventory's equipped weapon knows them (get_CurrentAmmoCount).
-local function case_inventory()
+-- Loaded rounds: the inventory's equipped weapon knows them (get_CurrentAmmoCount). The
+-- inventory controller is reached from the player, or failing that from InventoryManager.
+local function inventory_controller()
+    local pm = sdk.get_managed_singleton("chainsaw.PlayerManager")
+    local player = pm and try_call(pm, "get_CurrentPlayer")
+    local c = player and try_call(player, "get_InventoryController")
+    if c then return c, "PlayerManager" end
+    local cm = sdk.get_managed_singleton("chainsaw.CharacterManager")
+    player = cm and try_call(cm, "get_ManualPlayer")
+    c = player and try_call(player, "get_InventoryController")
+    if c then return c, "ManualPlayer" end
     local manager = sdk.get_managed_singleton("chainsaw.InventoryManager")
     local table_ = manager and manager:get_field("_ControllerTable")
     local values = table_ and try_call(table_, "get_Values")
     local it = values and try_call(values, "GetEnumerator")
-    while it and try_call(it, "MoveNext") do
+    for _ = 1, 64 do                         -- bounded: never spin on a bad enumerator
+        if not (it and try_call(it, "MoveNext")) then break end
         local controller = try_call(it, "get_Current")
         local td = controller and controller:get_type_definition()
-        if td and td:get_full_name() == "chainsaw.CsInventoryController" then return controller end
+        if td and td:get_full_name() == "chainsaw.CsInventoryController" then
+            return controller, "InventoryManager"
+        end
     end
-    return nil
+    return nil, "no inventory controller"
 end
 
 local function loaded_ammo()
-    local controller = case_inventory()
-    local weapon = controller and try_call(controller, "getEquippedWeapon")
-    return weapon and tonumber(try_call(weapon, "get_CurrentAmmoCount")) or nil
+    local controller, via = inventory_controller()
+    if not controller then
+        state.ammo_via = via
+        return nil
+    end
+    local weapon = try_call(controller, "getEquippedWeapon")
+    if not weapon then
+        local ok, w = pcall(controller.call, controller, "getEquippedWeapon", 0)
+        weapon = ok and w or nil
+    end
+    if not weapon then
+        state.ammo_via = via .. ": no equipped weapon"
+        return nil
+    end
+    local ammo = tonumber(try_call(weapon, "get_CurrentAmmoCount"))
+    state.ammo_via = via .. (ammo and "" or ": no ammo count")
+    return ammo
 end
 
 local function class_of(weapon)
@@ -209,9 +235,9 @@ end
 -- it changes (and shown in the menu), for troubleshooting from outside the game.
 local last_report
 local function report()
-    local line = string.format("player: %s | weapon: %s (%s) | ammo: %s | error: %s",
+    local line = string.format("player: %s | weapon: %s (%s) | ammo: %s (%s) | error: %s",
         tostring(state.stage), tostring(state.weapon), state.class, tostring(state.ammo),
-        tostring(state.error))
+        tostring(state.ammo_via), tostring(state.error))
     if line == last_report then return end
     last_report = line
     local f = io.open("DualSenseBridge/re4_status.txt", "wb")

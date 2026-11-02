@@ -15,15 +15,32 @@ Resident Evil 4 (2023) its own adaptive-trigger feel on a DualSense, played thro
 
 ## Install
 
-You need [DualSense Bridge](../../README.md#install) 1.7 or later, running with your controller
-connected. Then, about five minutes:
+You need [DualSense Bridge](../../README.md#install) 1.7 or later.
 
-### 1. Find the game folder
+### The quick way
+
+Right-click DualSense Bridge's tray icon → *Game mods* → *Resident Evil 4* → **Install adaptive
+triggers…**, and confirm. It finds the game through Steam, adds REFramework if the game doesn't
+have it yet (set to keep its own menu closed; press Insert to open it), downloads the script
+below, and moves any other trigger mod into `DualSenseBridge-backup` in the game folder (nothing
+is deleted). Then start (or restart) the game. *Update the mod…* in the same submenu fetches the
+latest version of the script, *How it works…* explains what it does, and *Uninstall…* removes it
+again. If DualSense Bridge installed REFramework and no other mod uses it, Uninstall removes it
+too; otherwise REFramework stays.
+
+To remove it by hand, delete `reframework\autorun\dualsense_bridge_re4.lua` and the
+`reframework\data\DualSenseBridge` folder.
+
+### By hand
+
+About five minutes:
+
+#### 1. Find the game folder
 
 In Steam, right-click **Resident Evil 4** → *Manage* → *Browse local files*. That opens the folder
 with `re4.exe` in it; the steps below all happen there.
 
-### 2. Install REFramework (skip if you already use it)
+#### 2. Install REFramework (skip if you already use it)
 
 REFramework is the mod loader that runs the script.
 
@@ -32,20 +49,20 @@ REFramework is the mod loader that runs the script.
 2. Open the zip and copy **`dinput8.dll`** into the game folder, next to `re4.exe`.
 3. Start the game once and quit. REFramework creates a `reframework` folder next to `re4.exe`.
 
-### 3. Add the trigger script
+#### 3. Add the trigger script
 
 1. Download **[dualsense_bridge_re4.lua](https://github.com/vingt-2/dualsense-bridge/raw/main/mods/re4-remake/reframework/autorun/dualsense_bridge_re4.lua)** (if your browser shows the
    text instead, right-click the link → *Save link as…*).
 2. Put it in `reframework\autorun` in the game folder.
 
-### 4. Remove any other trigger mod
+#### 4. Remove any other trigger mod
 
 If you installed another adaptive-trigger mod for RE4 (for example one that needs DualSenseX and a
 "UDP client"), remove it, or the two will fight over the triggers. For lunati_'s mod, delete
 `reframework\autorun\DualsenseX.lua` and the `reframework\autorun\DualsenseX` folder. You don't
 need DualSenseX or any helper app.
 
-### 5. Play
+#### 5. Play
 
 Start the game and draw a weapon: the triggers change with it. DualSense Bridge's tray menu
 shows *Game mod: re4.exe – …* with the current effects.

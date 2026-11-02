@@ -30,6 +30,7 @@ import updater
 from bridge import BluetoothDualSense
 import dsx
 import game_mods
+import mod_installer
 from dualsense_usb import WiredDualSense
 from actions import ACTIONS, ActionError
 from shortcut_window import Shortcut
@@ -48,6 +49,10 @@ QUIT_EVENT = "Local\\DualSenseBridgeQuit"
 
 # Controller haptics buffer (byte 5 of the BT haptics control packet, ~ms). Smaller is
 # more responsive but has less slack for Bluetooth/PC hiccups. Delays measured via IMU.
+# The "Haptics delay" menu was hidden in 1.7.0: the default (Balanced) held up in every game
+# tried. Set SHOW_HAPTICS_DELAY = True to bring the menu back. A "haptics_depth" saved in
+# settings.json (one of the values below) is still applied either way.
+SHOW_HAPTICS_DELAY = False
 HAPTICS_DEPTHS = [
     ("Lowest (~16 ms, may stutter)", 0x08),
     ("Low (~30 ms)", 0x10),
@@ -178,41 +183,57 @@ class TrayApp:
         self.dsx_enabled = settings.get("dsx_mods", True)
         self._dsx = None                   # (DsxServer, PayloadWatcher) while enabled
         self.mod_tip = None                # a running game whose mod isn't installed
-        self._tips_shown = set(settings.get("mod_tips_shown", []))
+        self.game_folders = {}             # game exe -> its folder, once found
+        self._installing = False
+        # games whose mod reminder the user turned off ("Don't remind me")
+        self._tips_dismissed = set(settings.get("mod_tips_dismissed", []))
         server.device.dsx.on_status = lambda: self.icon.update_menu()
 
         self.icon = pystray.Icon(TASK, ICONS["waiting"], APP, menu=pystray.Menu(
             pystray.MenuItem(lambda _: self._status_text(), None, enabled=False),
+            # missing drivers first: nothing works without them
+            pystray.MenuItem("Install usbip-win2…", lambda: webbrowser.open(USBIP_URL),
+                             visible=lambda _: self.usbip is None),
+            pystray.MenuItem("Install HidHide…", lambda: webbrowser.open(HIDHIDE_URL),
+                             visible=lambda _: self.hidhide is None),
             pystray.MenuItem(lambda _: self._dsx_status(), None, enabled=False,
                              visible=lambda _: bool(self._dsx_status())),
             pystray.MenuItem(lambda _: f"Get adaptive triggers for {self.mod_tip['name']}…"
-                             if self.mod_tip else "", self._open_mod_guide,
+                             if self.mod_tip else "", lambda: self._install_mod(self.mod_tip),
+                             visible=lambda _: self.mod_tip is not None,
+                             enabled=lambda _: not self._installing),
+            pystray.MenuItem(lambda _: f"Don't remind me about {self.mod_tip['name']}"
+                             if self.mod_tip else "", self._dismiss_mod_tip,
                              visible=lambda _: self.mod_tip is not None),
             pystray.MenuItem(lambda _: f"Update to {self.update.version}…" if self.update else "",
                              self._install_update, visible=lambda _: self.update is not None,
                              enabled=lambda _: not self._updating),
+            pystray.Menu.SEPARATOR,
+            # things to do
+            pystray.MenuItem("Game mods", pystray.Menu(*self._game_mod_items())),
+            pystray.MenuItem("Shortcuts…", lambda: shortcut_window.show(self)),
             pystray.MenuItem("Connection quality…", lambda: quality_window.show(self.bt)),
             pystray.MenuItem("Turn off controller", self._power_off,
                              enabled=lambda _: self.state != "waiting"),
-            pystray.MenuItem("Shortcuts…", lambda: shortcut_window.show(self)),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Hide Bluetooth controller from games", self._toggle_hide,
-                             checked=lambda _: self.hide_enabled,
-                             enabled=lambda _: self.hidhide is not None),
+            # settings
+            pystray.MenuItem("Audio", pystray.Menu(
+                pystray.MenuItem("Keep my default speaker and mic", self._toggle_keep_audio,
+                                 checked=lambda _: self.keep_audio),
+                pystray.MenuItem("Route all PC audio to the controller's headphone jack "
+                                 "when plugged in", self._toggle_headset_output,
+                                 checked=lambda _: self.headset_output))),
             pystray.MenuItem("Haptics delay", pystray.Menu(*[
                 pystray.MenuItem(label, self._depth_setter(depth), radio=True,
                                  checked=lambda _, d=depth: self.bt.haptics_depth == d)
-                for label, depth in HAPTICS_DEPTHS])),
-            pystray.MenuItem("Keep my default speaker and mic", self._toggle_keep_audio,
-                             checked=lambda _: self.keep_audio),
-            pystray.MenuItem("Route all PC audio to the controller's headphone jack when plugged in",
-                             self._toggle_headset_output,
-                             checked=lambda _: self.headset_output),
-            pystray.MenuItem("Game mods (adaptive triggers and lights from game mods)",
-                             self._toggle_dsx, checked=lambda _: self.dsx_enabled),
+                for label, depth in HAPTICS_DEPTHS]), visible=SHOW_HAPTICS_DELAY),
+            pystray.MenuItem("Hide Bluetooth controller from games", self._toggle_hide,
+                             checked=lambda _: self.hide_enabled,
+                             enabled=lambda _: self.hidhide is not None),
             pystray.MenuItem("Start with Windows", self._toggle_startup,
                              checked=lambda _: self._startup_enabled()),
-            pystray.MenuItem("Open log", lambda: os.startfile(LOG_PATH)),
+            pystray.Menu.SEPARATOR,
+            # upkeep
             pystray.MenuItem("Updates", pystray.Menu(
                 pystray.MenuItem("Check for updates automatically", self._toggle_check_updates,
                                  checked=lambda _: self.check_updates),
@@ -220,10 +241,7 @@ class TrayApp:
                     target=self._check_for_update, args=(True,), daemon=True).start()),
                 pystray.MenuItem(lambda _: f"Version {updater.VERSION or 'from source'}", None,
                                  enabled=False))),
-            pystray.MenuItem("Install usbip-win2…", lambda: webbrowser.open(USBIP_URL),
-                             visible=lambda _: self.usbip is None),
-            pystray.MenuItem("Install HidHide…", lambda: webbrowser.open(HIDHIDE_URL),
-                             visible=lambda _: self.hidhide is None),
+            pystray.MenuItem("Open log", lambda: os.startfile(LOG_PATH)),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Quit", self._quit),
         ))
@@ -265,22 +283,177 @@ class TrayApp:
             print("[mods] game mods turned off")
 
     def _check_game(self, pid, exe):
-        """A game with a mod we know of started, without its mod: offer the guide."""
+        """A game with a mod we know of started without it: remind the user, each launch,
+        until they install it or choose "Don't remind me"."""
         game = game_mods.suggestion(exe)
         if not game:
+            return
+        self.game_folders[game["exe"]] = os.path.dirname(exe)
+        if game["exe"] in self._tips_dismissed:
+            self.icon.update_menu()          # the Game mods submenu still offers it
             return
         self.mod_tip = game
         self.icon.update_menu()
         print(f"[mods] {game['name']} is running without its adaptive-trigger mod")
-        if game["exe"] not in self._tips_shown:      # tell once; the menu item stays
-            self._tips_shown.add(game["exe"])
-            _save_settings({"mod_tips_shown": sorted(self._tips_shown)})
-            self.icon.notify(f"{game['name']} can have adaptive triggers with a free mod. "
-                             "Right-click the tray icon to set it up.", APP)
+        self.icon.notify(f"{game['name']} can have adaptive triggers with a free mod. "
+                         f"Right-click the DualSense Bridge tray icon → Get adaptive triggers "
+                         f"for {game['name']}.", APP)
 
-    def _open_mod_guide(self):
-        if self.mod_tip:
-            webbrowser.open(self.mod_tip["guide"])
+    def _dismiss_mod_tip(self):
+        game, self.mod_tip = self.mod_tip, None
+        if game:
+            self._tips_dismissed.add(game["exe"])
+            _save_settings({"mod_tips_dismissed": sorted(self._tips_dismissed)})
+            print(f"[mods] no more reminders for {game['name']}")
+        self.icon.update_menu()
+
+    def _game_mod_items(self):
+        items = [pystray.MenuItem("Adaptive triggers and lights from game mods", self._toggle_dsx,
+                                  checked=lambda _: self.dsx_enabled),
+                 pystray.Menu.SEPARATOR]
+        for game in game_mods.GAMES:
+            items += self._game_items(game)
+        items.append(pystray.MenuItem("Setup guides…", lambda: webbrowser.open(
+            f"{game_mods.REPO}#game-mods")))
+        return items
+
+    def _game_items(self, game):
+        """A submenu per game: its state, install or update, how it works, the guide.
+        (pystray actions take at most 2 arguments, hence the closures.)"""
+        def state():
+            folder = self.game_folders.get(game["exe"])
+            if not folder:
+                return None
+            return "installed" if mod_installer.is_installed(game, folder) else "available"
+
+        def status(_):
+            return {"installed": "Adaptive triggers installed",
+                    "available": "Adaptive triggers not installed",
+                    None: "Not found on this PC"}[state()]
+
+        def install():
+            self._install_mod(game)
+
+        def about():
+            threading.Thread(target=self._about_mod, args=(game,), daemon=True).start()
+
+        def uninstall():
+            if not self._installing:
+                self._installing = True
+                threading.Thread(target=self._uninstall_mod_flow, args=(game,), daemon=True).start()
+
+        return [pystray.MenuItem(game["name"], pystray.Menu(
+            pystray.MenuItem(status, None, enabled=False),
+            pystray.MenuItem("Install adaptive triggers…", install,
+                             visible=lambda _: state() != "installed",
+                             enabled=lambda _: not self._installing),
+            pystray.MenuItem("Update the mod…", install,
+                             visible=lambda _: state() == "installed",
+                             enabled=lambda _: not self._installing),
+            pystray.MenuItem("Uninstall…", uninstall,
+                             visible=lambda _: state() == "installed",
+                             enabled=lambda _: not self._installing),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem("How it works…", about),
+            pystray.MenuItem("Setup guide…", lambda: webbrowser.open(game["guide"])),
+        ))]
+
+    def _uninstall_mod_flow(self, game):
+        try:
+            folder = self.game_folders.get(game["exe"])
+            if not folder or not mod_installer.is_installed(game, folder):
+                return
+            if not mod_installer.reframework_is_ours(game, folder):
+                loader = ("  •  REFramework, the mod loader, stays: DualSense Bridge didn't "
+                          "install it\n")
+            elif mod_installer.other_reframework_mods(game, folder):
+                loader = ("  •  REFramework, the mod loader, stays: other mods in the game "
+                          "use it\n")
+            else:
+                loader = ("  •  REFramework, the mod loader, is removed too: DualSense Bridge "
+                          "installed it and nothing else uses it (close the game first)\n")
+            if _ask(f"Uninstall adaptive triggers from {game['name']}?\n\n"
+                    f"From {folder}:\n"
+                    "  •  the trigger script and its settings are removed\n"
+                    + loader +
+                    "  •  anything in DualSenseBridge-backup (e.g. another trigger mod set aside "
+                    "earlier) stays where it is", 0x04) != 6:
+                return
+            mod_installer.uninstall(game, folder)
+            self.server.device.dsx.release()        # don't leave its effects on the triggers
+            self.icon.notify(f"Adaptive triggers removed from {game['name']}.", APP)
+        except Exception as e:
+            print(f"[mods] uninstalling from {game['name']} failed: {e}")
+            _ask(f"Couldn't uninstall adaptive triggers from {game['name']}:\n{e}", 0x00 | 0x10)
+        finally:
+            self._installing = False
+            self.icon.update_menu()
+
+    def _about_mod(self, game):
+        if _ask(game["about"] + "\n\nOpen the full guide (tuning, credits)?",
+                0x04 | 0x40, f"{game['name']}: adaptive triggers") == 6:
+            webbrowser.open(game["guide"])
+
+    def _find_games(self):
+        """Which known games are on this PC (Steam libraries), for the Game mods menu."""
+        try:
+            libraries = mod_installer.steam_libraries()
+            for game in game_mods.GAMES:
+                if game["exe"] not in self.game_folders and game.get("steam_appid"):
+                    folder = mod_installer.steam_game_folder(game["steam_appid"], libraries)
+                    if folder:
+                        self.game_folders[game["exe"]] = folder
+            self.icon.update_menu()
+        except Exception as e:
+            print(f"[mods] looking for games failed: {e}")
+
+    def _install_mod(self, game):
+        if game and not self._installing:
+            self._installing = True
+            threading.Thread(target=self._install_mod_flow, args=(game,), daemon=True).start()
+
+    def _install_mod_flow(self, game):
+        try:
+            folder = self.game_folders.get(game["exe"])
+            if not folder and game.get("steam_appid"):
+                folder = mod_installer.steam_game_folder(game["steam_appid"])
+            if not folder:
+                if _ask(f"Couldn't find {game['name']} on this PC. Open the setup guide?",
+                        0x04) == 6:
+                    webbrowser.open(game["guide"])
+                return
+            if mod_installer.is_installed(game, folder):
+                question = f"Update the adaptive-trigger mod for {game['name']} to the latest version?"
+            else:
+                question = f"Install adaptive triggers for {game['name']}?"
+            answer = _ask(
+                question + "\n\n"
+                f"Into {folder}:\n"
+                "  •  REFramework, the mod loader (from github.com/praydog/REFramework), "
+                "if it isn't installed yet\n"
+                "  •  DualSense Bridge's trigger script (from github.com/vingt-2/dualsense-bridge)\n"
+                "  •  another adaptive-trigger mod, if there is one, is moved into "
+                "DualSenseBridge-backup, not deleted\n\n"
+                "Yes: go ahead.     No: open the step-by-step guide instead.", 0x03)
+            if answer == 7:
+                webbrowser.open(game["guide"])
+            if answer != 6:
+                return
+            done = mod_installer.install(game, folder)
+            self.game_folders[game["exe"]] = folder
+            if self.mod_tip is game:
+                self.mod_tip = None
+            restart = " Restart the game if it's running." if done[0].startswith("installed") else (
+                " If the game is running, restart it (or Reset scripts in REFramework).")
+            self.icon.notify(f"Adaptive triggers installed for {game['name']}.{restart}", APP)
+        except Exception as e:
+            print(f"[mods] installing for {game['name']} failed: {e}")
+            if _ask(f"Couldn't install adaptive triggers for {game['name']}:\n{e}\n\n"
+                    "Open the step-by-step guide instead?", 0x04 | 0x10) == 6:
+                webbrowser.open(game["guide"])
+        finally:
+            self._installing = False
+            self.icon.update_menu()
 
     def _set_state(self, state):
         self.state = state
@@ -605,8 +778,18 @@ class TrayApp:
             threading.Thread(target=self._update_loop, daemon=True).start()
             if self.dsx_enabled:
                 self._start_dsx()
+            threading.Thread(target=self._find_games, daemon=True).start()
 
         self.icon.run(setup=setup)
+
+
+def _ask(text, flags, title=APP):
+    """A message box (flags: 0x03 yes/no/cancel, 0x04 yes/no; icon 0x10 error, 0x40 info,
+    else a question mark); returns 6 for Yes, 7 for No."""
+    MB_ICONQUESTION, MB_SETFOREGROUND, MB_TOPMOST = 0x20, 0x10000, 0x40000
+    icon = 0 if flags & 0xF0 else MB_ICONQUESTION
+    return ctypes.windll.user32.MessageBoxW(None, text, title,
+                                            flags | icon | MB_SETFOREGROUND | MB_TOPMOST)
 
 
 class _Log:
@@ -651,7 +834,7 @@ def main():
     sys.stdout = sys.stderr = _Log(LOG_PATH)
 
     bt = BluetoothDualSense()
-    depth = _load_settings().get("haptics_depth")
+    depth = _load_settings().get("haptics_depth")    # see SHOW_HAPTICS_DELAY
     if depth in [d for _, d in HAPTICS_DEPTHS]:
         bt.haptics_depth = depth
     server = UsbIpServer(WiredDualSense(bt))

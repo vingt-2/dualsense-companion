@@ -795,9 +795,10 @@ class PayloadWatcher:
             folder = os.path.dirname(exe)
             if folder.lower().startswith(os.environ.get("SystemRoot", r"C:\Windows").lower()):
                 continue
-            if folder not in self._folders:
-                self._folders[folder] = [p for p in self._paths
-                                         if os.path.isdir(os.path.join(folder, p.split("\\")[0]))]
+            # Checked again for every new process, not cached per folder: a mod (or its
+            # loader) may have been installed since the game last ran.
+            self._folders[folder] = [p for p in self._paths
+                                     if os.path.isdir(os.path.join(folder, p.split("\\")[0]))]
             if self._folders[folder]:
                 self._watching.add(pid)
                 threading.Thread(target=self.watch, daemon=True, name=f"dsx-payload-{pid}",

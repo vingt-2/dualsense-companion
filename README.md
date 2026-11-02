@@ -16,7 +16,7 @@ virtual USB DualSense that looks like the real wired one, so those games enable 
 | Rumble | ✅ (works with old and new controller firmware) |
 | Adaptive triggers | ✅ |
 | Lightbar, player LEDs, mic LED | ✅ |
-| HD haptics (e.g. Assassin's Creed Mirage) | ✅ ~50 ms delay by default, adjustable |
+| HD haptics (e.g. Assassin's Creed Mirage) | ✅ ~50 ms delay |
 | Controller speaker | ✅ |
 | Controller microphone | ✅ |
 | Headphone jack | ✅ (stereo; the speaker goes quiet while headphones are in) |
@@ -49,13 +49,15 @@ the virtual controller and to configure HidHide). The icon shows the state:
 - **Amber**: connecting
 - **Blue**: active, games see a wired DualSense
 
-Right-click the icon for:
+Right-click the icon for (top to bottom):
 
-- **Connection quality…**: a live view of the Bluetooth link: reports per second, dropouts
-  (gaps over 10 ms), the longest gap, and a chart of the last minute. Use it to find a good spot
-  for the controller and the Bluetooth adapter: press *Reset* after each change and give it 30 seconds.
-  Gaps longer than the haptics delay can make haptics stutter.
-- **Turn off controller**: powers the controller down (press PS to turn it back on).
+- **Game mods**: adaptive triggers and lights from game mods, on by default (see
+  [Game mods](#game-mods)). While a mod is active, the top of the menu shows which one and its
+  effects. Each game we have a mod for gets its own submenu: whether the mod is installed,
+  *Install adaptive triggers…* (or *Update the mod…* and *Uninstall…*), *How it works…* and
+  *Setup guide…*. Each time you start such a game without its mod, a notification says so and
+  the top of the menu offers *Get adaptive triggers for …*, until you install it or choose
+  *Don't remind me about …*.
 - **Shortcuts…**: controller shortcuts that do things on the PC. A shortcut is a button
   combination (e.g. *L1 + R1 + Options*), pressed one or more times (e.g. *PS ×3*) or held down
   for a while (e.g. *Options (hold 2 s)*); record it by doing it on the controller. A press
@@ -91,24 +93,26 @@ Right-click the icon for:
   > switching doesn't let you pick a window with the d-pad, while *Scroll through windows* does.
 
   New actions go in `actions.py`: one small class each.
-- **Haptics delay**: how much haptics data the controller buffers. *Balanced (~40 ms)* is the default;
-  *Low* or *Lowest* feel more immediate but may stutter when the PC or Bluetooth is busy.
+- **Connection quality…**: a live view of the Bluetooth link: reports per second, dropouts
+  (gaps over 10 ms), the longest gap, and a chart of the last minute. Use it to find a good spot
+  for the controller and the Bluetooth adapter: press *Reset* after each change and give it 30 seconds.
+  Gaps longer than the haptics buffer (~40 ms) can make haptics stutter.
+- **Turn off controller**: powers the controller down (press PS to turn it back on).
+- **Audio**:
+  - **Keep my default speaker and mic**: the virtual controller adds a "DualSense Wireless
+    Controller" sound device, and Windows tends to make new sound devices the default. This puts
+    yours back.
+  - **Route all PC audio to the controller's headphone jack when plugged in** (on by default, like
+    a PS5): while headphones are plugged into the controller, make it Windows' default playback
+    device, and switch back when they're unplugged. The controller's speaker, like on a PS5, only
+    plays sound sent to the controller (e.g. a game's controller speaker effects).
 - **Hide Bluetooth controller from games** (HidHide), on by default.
-- **Route all PC audio to the controller's headphone jack when plugged in** (on by default, like a PS5): while headphones are
-  plugged into the controller, make it Windows' default playback device, and switch back when
-  they're unplugged. The controller's speaker, like on a PS5, only plays sound sent to the
-  controller (e.g. a game's controller speaker effects).
-- **Keep my default speaker and mic**: the virtual controller adds a "DualSense Wireless Controller"
-  sound device, and Windows tends to make new sound devices the default. This puts yours back.
+- **Start with Windows**.
 - **Updates**: DualSense Bridge checks GitHub for a new release a minute after it starts and then
   once a day, and tells you once per new version. *Update to x.y.z…* then appears at the top of the
   menu: it downloads the new installer, which closes the app, installs and starts the new version.
   Turn off *Check for updates automatically* to stop the checks; *Check now* checks right away.
-- **Game mods (adaptive triggers and lights from game mods)**, on by default: see
-  [Game mods](#game-mods). While a mod is active, the menu shows which one and its effects.
-  When you start a game that has a mod for this and it isn't installed, the menu offers
-  *Get adaptive triggers for …*, which opens its setup guide.
-- **Start with Windows**, **Open log**, **Quit**.
+- **Open log**, **Quit**.
 
 ### Game mods
 
@@ -116,8 +120,9 @@ Many games on PC never got adaptive triggers, but mods add them, and DualSense B
 them on your controller with no other app running.
 
 - **Resident Evil 4 (2023)**: this repository has its own mod, where guns fire when the trigger
-  wall breaks. Setup guide: [mods/re4-remake](mods/re4-remake/README.md). If you start the game
-  without it, the tray menu offers the guide.
+  wall breaks. Tray menu → *Game mods* → *Resident Evil 4* → *Install adaptive triggers…* sets it
+  up in one click (it adds REFramework, the mod loader, if the game doesn't have it). Or by hand:
+  [mods/re4-remake](mods/re4-remake/README.md).
 - **Other games** (Skyrim, Fallout 4, RDR2, GTA, …): trigger mods made for DualSenseX work as
   they are. Install the mod as its page says, but skip DualSenseX and any helper app the mod
   asks you to run: DualSense Bridge takes their place. If DualSenseX is running anyway, the
@@ -224,7 +229,8 @@ To run from source instead: `pip install -r requirements.txt`, install usbip-win
 | `audio_default.py` | Restores Windows' default sound devices |
 | `updater.py` | Update check against the latest GitHub release, download and install |
 | `dsx.py` | Game mods: their UDP protocol, trigger effects and payload files |
-| `game_mods.py` | Games with a known trigger mod, for the tray's setup suggestion |
+| `game_mods.py` | Games with a trigger mod of ours: where it goes, what it conflicts with |
+| `mod_installer.py` | One-click install: finds the game, adds REFramework and the mod |
 | `mods/` | Game scripts that use it (Resident Evil 4 (2023)) |
 | `installer/` | Inno Setup script and the dependency downloader |
 

@@ -13,6 +13,10 @@ python tests\test_shortcuts.py
 if ($LASTEXITCODE -ne 0) { throw "shortcut self-test failed" }
 python tests\test_dsx.py
 if ($LASTEXITCODE -ne 0) { throw "DSX self-test failed" }
+python tests\test_mod_installer.py
+if ($LASTEXITCODE -ne 0) { throw "mod installer self-test failed" }
+python tests\test_tray_menu.py
+if ($LASTEXITCODE -ne 0) { throw "tray menu self-test failed" }
 python tests\test_re4_mod.py   # skips unless lupa is installed
 if ($LASTEXITCODE -ne 0) { throw "RE4 script self-test failed" }
 
