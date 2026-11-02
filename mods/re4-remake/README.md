@@ -1,4 +1,4 @@
-# Adaptive triggers for Resident Evil 4 (2023)
+# DualSense mod for Resident Evil 4 (2023)
 
 A small [REFramework](https://github.com/praydog/REFramework) script that gives every weapon in
 Resident Evil 4 (2023) its own adaptive-trigger feel on a DualSense, played through
@@ -19,8 +19,8 @@ You need [DualSense Bridge](../../README.md#install) 1.7 or later.
 
 ### The quick way
 
-Right-click DualSense Bridge's tray icon → *Game mods* → *Resident Evil 4* → **Install adaptive
-triggers…**, and confirm. It finds the game through Steam, adds REFramework if the game doesn't
+Right-click DualSense Bridge's tray icon → *Game mods* → *Resident Evil 4* → **Install the DualSense
+mod…**, and confirm. It finds the game through Steam, adds REFramework if the game doesn't
 have it yet (set to keep its own menu closed; press Insert to open it), downloads the script
 below, and moves any other trigger mod into `DualSenseBridge-backup` in the game folder (nothing
 is deleted). Then start (or restart) the game. *Update the mod…* in the same submenu fetches the

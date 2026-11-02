@@ -41,7 +41,7 @@ game + mod ──(writes a payload JSON file)──┘     (triggers,        eve
 - `game_mods.py`: the catalogue of games **we** ship a mod for (detection + install data).
 - `mod_installer.py`: one-click install (Steam lookup, REFramework from GitHub releases, our
   script from this repo's `main`, conflicting mods moved to `DualSenseBridge-backup`).
-- `tray_app.py`: the *Game mods* submenu, the "Get adaptive triggers for …" suggestion when a
+- `tray_app.py`: the *Game mods* submenu, the "Get the DualSense mod for …" suggestion when a
   catalogued game runs without its mod, and the install flow (confirm dialog -> install -> notify).
 - `mods/<game>/`: the mods themselves, each with a README that doubles as the manual guide.
 
@@ -69,7 +69,8 @@ changes; you only write a mod for games that have none, or whose mod is broken.
    - Write a one-line status file next to the payload (what was detected, any error) so problems
      can be diagnosed from outside the game without asking the user to read menus.
 2. **Register the payload path** in `dsx.PAYLOAD_PATHS` (relative to the game exe's folder).
-3. **Add the game to `game_mods.GAMES`**: `exe`, `name`, `installed` (files that mean the mod is
+3. **Add the game to `game_mods.GAMES`**: `exe`, `name`, `features` (what the mod adds, e.g.
+   "adaptive triggers and PlayStation button prompts", used in the tray's messages), `installed` (files that mean the mod is
    there), `data` (the mod's own data folder, removed on uninstall; the installer also keeps its
    "we installed REFramework" marker there), `guide` (URL of the mod's README), `about` (a plain-language "how it works" for the
    tray's per-game submenu; no jargon), and for the one-click install `steam_appid`,
@@ -84,7 +85,7 @@ changes; you only write a mod for games that have none, or whose mod is broken.
    REFramework to keep its window hidden, see above; uninstall removes REFramework only with that marker and no other REFramework mods); a
    game with another loader needs a new branch there.
 4. **Write the mod's README** (`mods/<game>/README.md`): what it does, "The quick way" (tray ->
-   *Game mods* -> *<game>* -> *Install adaptive triggers…*), "By hand" steps a non-modder can follow,
+   *Game mods* -> *<game>* -> *Install the DualSense mod…*), "By hand" steps a non-modder can follow,
    troubleshooting, tuning, credits.
 5. **Tests**, and add each new test script to `build.ps1` (the build runs them all):
    - extend `tests/test_dsx.py` / `tests/test_mod_installer.py` / `tests/test_tray_menu.py`;

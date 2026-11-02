@@ -1,4 +1,4 @@
-"""Installs a game's adaptive-trigger mod (see game_mods.py): REFramework from its GitHub
+"""Installs a game's DualSense mod (see game_mods.py): REFramework from its GitHub
 releases if the game doesn't have it yet, then our script from this repository.
 
 Nothing is deleted: a conflicting mod is moved into DualSenseBridge-backup in the game folder.
@@ -148,9 +148,18 @@ REFRAMEWORK_FILES = ["dinput8.dll", REFRAMEWORK_CONFIG, "re2_framework_log.txt",
 
 
 def install(game, folder, get=_get, reframework=latest_reframework, log=print):
-    """Install the game's mod into folder. Returns a list of what was done."""
+    """Install the game's mod into folder. Returns a list of what was done.
+
+    Everything is downloaded first, so a failed download leaves the game folder untouched."""
     done = []
+    files = {}
+    for rel, url in game["files"].items():
+        data = get(url)
+        if not data.strip():
+            raise RuntimeError(f"empty download: {url}")
+        files[rel] = data
     loader = os.path.join(folder, "dinput8.dll")
+    loader_data = None
     if not os.path.exists(loader):
         repo, asset, branch = reframework_source(game, folder)
         tag, url = reframework(asset, repo)
@@ -160,7 +169,11 @@ def install(game, folder, get=_get, reframework=latest_reframework, log=print):
             name = next((n for n in z.namelist() if n.lower().endswith("dinput8.dll")), None)
             if not name:
                 raise RuntimeError(f"{asset} has no dinput8.dll")
-            _write(loader, z.read(name))
+            loader_data = z.read(name)
+
+    # all downloaded: now change the game folder
+    if loader_data is not None:
+        _write(loader, loader_data)
         # remember that REFramework came from us, so uninstalling may take it away again
         _write(os.path.join(folder, game["data"], REFRAMEWORK_MARKER), f"{tag}\n".encode())
         done.append(f"installed REFramework {tag}")
@@ -188,10 +201,7 @@ def install(game, folder, get=_get, reframework=latest_reframework, log=print):
     if game.get("loose_files"):
         settings.update(LOOSE_FILES)
     set_config(os.path.join(folder, REFRAMEWORK_CONFIG), settings)
-    for rel, url in game["files"].items():
-        data = get(url)
-        if not data.strip():
-            raise RuntimeError(f"empty download: {url}")
+    for rel, data in files.items():
         _write(os.path.join(folder, rel), data)
     done.append("installed the mod")
     log(f"[mods] {game['name']}: " + "; ".join(done))

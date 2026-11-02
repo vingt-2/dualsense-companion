@@ -21,8 +21,8 @@ You need [DualSense Bridge](../../README.md#install) 1.7 or later.
 
 ### The quick way
 
-Right-click DualSense Bridge's tray icon → *Game mods* → *Resident Evil 7* → **Install adaptive
-triggers…**, and confirm (close the game first). It finds the game through Steam, adds
+Right-click DualSense Bridge's tray icon → *Game mods* → *Resident Evil 7* → **Install the DualSense
+mod…**, and confirm (close the game first). It finds the game through Steam, adds
 REFramework if the game doesn't have it yet (the right build for your version of the game, with
 its own menu kept closed: press Insert to open it), downloads the script and the button icons
 below, and turns on REFramework's loose file loader, which loads the icons. Then start the game.

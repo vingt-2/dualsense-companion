@@ -1,4 +1,5 @@
-"""Games with a mod that adds adaptive triggers through DualSense Bridge.
+"""Games with a DualSense mod of ours (adaptive triggers, and PlayStation button prompts
+where the game lacks them), played through DualSense Bridge.
 
 When one of these games is running and its mod isn't installed, the tray offers the mod's
 setup guide. A new game is one more entry here.
@@ -16,9 +17,10 @@ GAMES = [
         "installed": [r"reframework\autorun\dualsense_bridge_re4.lua"],
         "data": r"reframework\data\DualSenseBridge",      # the mod's own files (removed on uninstall)
         "guide": f"{REPO}/tree/main/mods/re4-remake#readme",
+        "features": "adaptive triggers",          # what the mod adds, for the tray's messages
         # shown by the tray's "How it works…"
         "about": (
-            "Resident Evil 4 on PC has no adaptive triggers. This mod adds them.\n\n"
+            "Resident Evil 4 on PC has no adaptive triggers. This DualSense mod adds them.\n\n"
             "•  A small script runs inside the game through REFramework, a widely used mod "
             "loader for Capcom's games. Several times a second it checks which weapon you're "
             "holding and how many rounds are loaded.\n\n"
@@ -55,8 +57,10 @@ GAMES = [
         "installed": [r"reframework\autorun\dualsense_bridge_re7.lua"],
         "data": r"reframework\data\DualSenseBridge",
         "guide": f"{REPO}/tree/main/mods/re7#readme",
+        "features": "adaptive triggers and PlayStation button prompts",
         "about": (
-            "Resident Evil 7 on PC has no adaptive triggers. This mod adds them, in the main "
+            "Resident Evil 7 on PC has no adaptive triggers and only shows Xbox buttons. This "
+            "DualSense mod adds adaptive triggers and PlayStation button prompts, in the main "
             "game and the DLC episodes.\n\n"
             "•  A small script runs inside the game through REFramework, a widely used mod "
             "loader for Capcom's games. Several times a second it checks which weapon you're "

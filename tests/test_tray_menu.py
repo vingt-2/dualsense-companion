@@ -62,20 +62,20 @@ def main():
     folder = tempfile.mkdtemp()
     app.game_folders["re4.exe"] = folder
     menu = "\n".join(walk(app.icon.menu, app.icon))
-    assert "Adaptive triggers not installed visible=True" in menu, menu
-    assert "Install adaptive triggers… visible=True" in menu, menu
+    assert "DualSense mod not installed visible=True" in menu, menu
+    assert "Install the DualSense mod… visible=True" in menu, menu
     assert "Update the mod… visible=False" in menu, menu
     assert "Uninstall… visible=False" in menu, menu
     os.makedirs(os.path.join(folder, "reframework", "autorun"))
     open(os.path.join(folder, "reframework", "autorun", "dualsense_bridge_re4.lua"), "w").close()
     menu = "\n".join(walk(app.icon.menu, app.icon))
-    assert "Adaptive triggers installed visible=True" in menu, menu
-    assert "Install adaptive triggers… visible=False" in menu, menu
+    assert "DualSense mod installed visible=True" in menu, menu
+    assert "Install the DualSense mod… visible=False" in menu, menu
     assert "Update the mod… visible=True" in menu, menu
     assert "Uninstall… visible=True" in menu, menu
     # every game in the catalogue has an explanation
     import game_mods
-    assert all(len(g.get("about", "")) > 200 for g in game_mods.GAMES)
+    assert all(len(g.get("about", "")) > 200 and g.get("features") for g in game_mods.GAMES)
     # reminders: each launch of the game without its mod notifies, until "Don't remind me"
     notes = []
     app.icon.notify = lambda text, title=None: notes.append(text)

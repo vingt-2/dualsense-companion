@@ -154,6 +154,19 @@ def main():
     assert not os.path.exists(os.path.join(fresh, "natives", "stm", "ui"))
     assert os.path.exists(os.path.join(fresh, "natives", "stm", "other", "keep.tex"))
 
+    # a failed download (e.g. a 404 on the second file) leaves the game folder untouched
+    fresh = tempfile.mkdtemp()
+    def get_failing(url):
+        if "ui0010" in url:
+            raise OSError("HTTP Error 404: Not Found")
+        return get7(url)
+    try:
+        mod_installer.install(re7, fresh, get=get_failing, reframework=reframework7, log=lambda s: None)
+        raise AssertionError("failed download accepted")
+    except OSError:
+        pass
+    assert os.listdir(fresh) == [], os.listdir(fresh)
+
     # Steam: the app manifest says where the game is
     lib = tempfile.mkdtemp()
     os.makedirs(os.path.join(lib, "steamapps", "common", "RE4 Folder"))

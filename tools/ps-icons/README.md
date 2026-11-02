@@ -13,7 +13,7 @@ PlayStation icons and loading it with REFramework's loose file loader fixes ever
   including the header and the keyboard/mouse icons, stays the game's own.
 
 The built textures for each game live with its mod (`mods/<game>/icons/natives/...`), and the
-tray's *Install adaptive triggers…* installs them with the trigger script.
+tray's *Install the DualSense mod…* installs them with the trigger script.
 
 ## Rebuilding (e.g. after a game update changes its atlas)
 

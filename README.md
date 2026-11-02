@@ -54,9 +54,9 @@ Right-click the icon for (top to bottom):
 - **Game mods**: adaptive triggers and lights from game mods, on by default (see
   [Game mods](#game-mods)). While a mod is active, the top of the menu shows which one and its
   effects. Each game we have a mod for gets its own submenu: whether the mod is installed,
-  *Install adaptive triggers…* (or *Update the mod…* and *Uninstall…*), *How it works…* and
+  *Install the DualSense mod…* (or *Update the mod…* and *Uninstall…*), *How it works…* and
   *Setup guide…*. Each time you start such a game without its mod, a notification says so and
-  the top of the menu offers *Get adaptive triggers for …*, until you install it or choose
+  the top of the menu offers *Get the DualSense mod for …*, until you install it or choose
   *Don't remind me about …*.
 - **Shortcuts…**: controller shortcuts that do things on the PC. A shortcut is a button
   combination (e.g. *L1 + R1 + Options*), pressed one or more times (e.g. *PS ×3*) or held down
@@ -119,13 +119,13 @@ Right-click the icon for (top to bottom):
 Many games on PC never got adaptive triggers, but mods add them, and DualSense Bridge plays
 them on your controller with no other app running.
 
-- **Resident Evil 4 (2023)**: this repository has its own mod, where guns fire when the trigger
-  wall breaks. Tray menu → *Game mods* → *Resident Evil 4* → *Install adaptive triggers…* sets it
+- **Resident Evil 4 (2023)**: this repository has its own DualSense mod, where guns fire when the
+  trigger wall breaks. Tray menu → *Game mods* → *Resident Evil 4* → *Install the DualSense mod…* sets it
   up in one click (it adds REFramework, the mod loader, if the game doesn't have it). Or by hand:
   [mods/re4-remake](mods/re4-remake/README.md).
 - **Resident Evil 7 biohazard**: the same, for the main game and the DLC episodes, plus
   PlayStation button prompts instead of the PC version's Xbox ones. Tray menu → *Game mods* →
-  *Resident Evil 7* → *Install adaptive triggers…*, or by hand: [mods/re7](mods/re7/README.md).
+  *Resident Evil 7* → *Install the DualSense mod…*, or by hand: [mods/re7](mods/re7/README.md).
 - **Other games** (Skyrim, Fallout 4, RDR2, GTA, …): trigger mods made for DualSenseX work as
   they are. Install the mod as its page says, but skip DualSenseX and any helper app the mod
   asks you to run: DualSense Bridge takes their place. If DualSenseX is running anyway, the

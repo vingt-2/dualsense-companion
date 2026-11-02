@@ -198,7 +198,7 @@ class TrayApp:
                              visible=lambda _: self.hidhide is None),
             pystray.MenuItem(lambda _: self._dsx_status(), None, enabled=False,
                              visible=lambda _: bool(self._dsx_status())),
-            pystray.MenuItem(lambda _: f"Get adaptive triggers for {self.mod_tip['name']}…"
+            pystray.MenuItem(lambda _: f"Get the DualSense mod for {self.mod_tip['name']}…"
                              if self.mod_tip else "", lambda: self._install_mod(self.mod_tip),
                              visible=lambda _: self.mod_tip is not None,
                              enabled=lambda _: not self._installing),
@@ -294,9 +294,9 @@ class TrayApp:
             return
         self.mod_tip = game
         self.icon.update_menu()
-        print(f"[mods] {game['name']} is running without its adaptive-trigger mod")
-        self.icon.notify(f"{game['name']} can have adaptive triggers with a free mod. "
-                         f"Right-click the DualSense Bridge tray icon → Get adaptive triggers "
+        print(f"[mods] {game['name']} is running without its DualSense mod")
+        self.icon.notify(f"{game['name']} can have {game['features']} with a free DualSense "
+                         f"mod. Right-click the DualSense Bridge tray icon → Get the DualSense mod "
                          f"for {game['name']}.", APP)
 
     def _dismiss_mod_tip(self):
@@ -327,8 +327,8 @@ class TrayApp:
             return "installed" if mod_installer.is_installed(game, folder) else "available"
 
         def status(_):
-            return {"installed": "Adaptive triggers installed",
-                    "available": "Adaptive triggers not installed",
+            return {"installed": "DualSense mod installed",
+                    "available": "DualSense mod not installed",
                     None: "Not found on this PC"}[state()]
 
         def install():
@@ -344,7 +344,7 @@ class TrayApp:
 
         return [pystray.MenuItem(game["name"], pystray.Menu(
             pystray.MenuItem(status, None, enabled=False),
-            pystray.MenuItem("Install adaptive triggers…", install,
+            pystray.MenuItem("Install the DualSense mod…", install,
                              visible=lambda _: state() != "installed",
                              enabled=lambda _: not self._installing),
             pystray.MenuItem("Update the mod…", install,
@@ -386,7 +386,7 @@ class TrayApp:
                           "installed it and nothing else uses it (close the game first)\n")
             if not self._game_closed(game):
                 return
-            if _ask(f"Uninstall adaptive triggers from {game['name']}?\n\n"
+            if _ask(f"Uninstall the DualSense mod from {game['name']}?\n\n"
                     f"From {folder}:\n"
                     "  •  the trigger script and its settings are removed\n"
                     + loader +
@@ -395,17 +395,17 @@ class TrayApp:
                 return
             mod_installer.uninstall(game, folder)
             self.server.device.dsx.release()        # don't leave its effects on the triggers
-            self.icon.notify(f"Adaptive triggers removed from {game['name']}.", APP)
+            self.icon.notify(f"DualSense mod removed from {game['name']}.", APP)
         except Exception as e:
             print(f"[mods] uninstalling from {game['name']} failed: {e}")
-            _ask(f"Couldn't uninstall adaptive triggers from {game['name']}:\n{e}", 0x00 | 0x10)
+            _ask(f"Couldn't uninstall the DualSense mod from {game['name']}:\n{e}", 0x00 | 0x10)
         finally:
             self._installing = False
             self.icon.update_menu()
 
     def _about_mod(self, game):
         if _ask(game["about"] + "\n\nOpen the full guide (tuning, credits)?",
-                0x04 | 0x40, f"{game['name']}: adaptive triggers") == 6:
+                0x04 | 0x40, f"{game['name']}: DualSense mod") == 6:
             webbrowser.open(game["guide"])
 
     def _find_games(self):
@@ -437,15 +437,16 @@ class TrayApp:
                     webbrowser.open(game["guide"])
                 return
             if mod_installer.is_installed(game, folder):
-                question = f"Update the adaptive-trigger mod for {game['name']} to the latest version?"
+                question = f"Update the DualSense mod for {game['name']} to the latest version?"
             else:
-                question = f"Install adaptive triggers for {game['name']}?"
+                question = (f"Install the DualSense mod for {game['name']} "
+                            f"({game['features']})?")
             answer = _ask(
                 question + "\n\n"
                 f"Into {folder}:\n"
                 "  •  REFramework, the mod loader (from github.com/praydog/REFramework), "
                 "if it isn't installed yet\n"
-                "  •  DualSense Bridge's trigger script (from github.com/vingt-2/dualsense-bridge)\n"
+                "  •  DualSense Bridge's script (from github.com/vingt-2/dualsense-bridge)\n"
                 + ("  •  PlayStation button icons for the game's prompts, and REFramework's "
                    "loose file loader turned on to load them\n" if game.get("loose_files") else "") +
                 "  •  another adaptive-trigger mod, if there is one, is moved into "
@@ -461,10 +462,10 @@ class TrayApp:
                 self.mod_tip = None
             restart = " Restart the game if it's running." if done[0].startswith("installed") else (
                 " If the game is running, restart it (or Reset scripts in REFramework).")
-            self.icon.notify(f"Adaptive triggers installed for {game['name']}.{restart}", APP)
+            self.icon.notify(f"DualSense mod installed for {game['name']}.{restart}", APP)
         except Exception as e:
             print(f"[mods] installing for {game['name']} failed: {e}")
-            if _ask(f"Couldn't install adaptive triggers for {game['name']}:\n{e}\n\n"
+            if _ask(f"Couldn't install the DualSense mod for {game['name']}:\n{e}\n\n"
                     "Open the step-by-step guide instead?", 0x04 | 0x10) == 6:
                 webbrowser.open(game["guide"])
         finally:
