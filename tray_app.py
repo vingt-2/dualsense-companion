@@ -28,6 +28,8 @@ import quality_window
 import shortcut_window
 import updater
 from bridge import BluetoothDualSense
+import dsx
+import game_mods
 from dualsense_usb import WiredDualSense
 from actions import ACTIONS, ActionError
 from shortcut_window import Shortcut
@@ -172,9 +174,20 @@ class TrayApp:
         self._startup = None
         self._lock = threading.Lock()
         bt.on_state = lambda up: threading.Thread(target=self._on_bt_state, args=(up,), daemon=True).start()
+        # Game mods (adaptive triggers and lights): their UDP protocol and payload files
+        self.dsx_enabled = settings.get("dsx_mods", True)
+        self._dsx = None                   # (DsxServer, PayloadWatcher) while enabled
+        self.mod_tip = None                # a running game whose mod isn't installed
+        self._tips_shown = set(settings.get("mod_tips_shown", []))
+        server.device.dsx.on_status = lambda: self.icon.update_menu()
 
         self.icon = pystray.Icon(TASK, ICONS["waiting"], APP, menu=pystray.Menu(
             pystray.MenuItem(lambda _: self._status_text(), None, enabled=False),
+            pystray.MenuItem(lambda _: self._dsx_status(), None, enabled=False,
+                             visible=lambda _: bool(self._dsx_status())),
+            pystray.MenuItem(lambda _: f"Get adaptive triggers for {self.mod_tip['name']}…"
+                             if self.mod_tip else "", self._open_mod_guide,
+                             visible=lambda _: self.mod_tip is not None),
             pystray.MenuItem(lambda _: f"Update to {self.update.version}…" if self.update else "",
                              self._install_update, visible=lambda _: self.update is not None,
                              enabled=lambda _: not self._updating),
@@ -195,6 +208,8 @@ class TrayApp:
             pystray.MenuItem("Route all PC audio to the controller's headphone jack when plugged in",
                              self._toggle_headset_output,
                              checked=lambda _: self.headset_output),
+            pystray.MenuItem("Game mods (adaptive triggers and lights from game mods)",
+                             self._toggle_dsx, checked=lambda _: self.dsx_enabled),
             pystray.MenuItem("Start with Windows", self._toggle_startup,
                              checked=lambda _: self._startup_enabled()),
             pystray.MenuItem("Open log", lambda: os.startfile(LOG_PATH)),
@@ -220,6 +235,52 @@ class TrayApp:
         return {"waiting": "Waiting for DualSense (Bluetooth)…",
                 "connected": "Connected – attaching…",
                 "wired": "Active – showing as wired controller"}[self.state]
+
+    def _dsx_status(self):
+        o = self.server.device.dsx
+        if not (self.dsx_enabled and o.active and o.source):
+            return ""
+        return f"Game mod: {o.source} – {o.describe()}"
+
+    # -- game mods --------------------------------------------------------------
+    def _start_dsx(self):
+        o = self.server.device.dsx
+        o.enabled = True
+        self._dsx = (dsx.DsxServer(o, self.server.device.dsx_status),
+                     dsx.PayloadWatcher(o, on_process=self._check_game))
+        for part in self._dsx:
+            part.start()
+
+    def _toggle_dsx(self):
+        self.dsx_enabled = not self.dsx_enabled
+        _save_settings({"dsx_mods": self.dsx_enabled})
+        if self.dsx_enabled:
+            self._start_dsx()
+        else:
+            for part in self._dsx or ():
+                part.stop()
+            self._dsx = None
+            self.server.device.dsx.enabled = False
+            self.server.device.dsx.release()
+            print("[mods] game mods turned off")
+
+    def _check_game(self, pid, exe):
+        """A game with a mod we know of started, without its mod: offer the guide."""
+        game = game_mods.suggestion(exe)
+        if not game:
+            return
+        self.mod_tip = game
+        self.icon.update_menu()
+        print(f"[mods] {game['name']} is running without its adaptive-trigger mod")
+        if game["exe"] not in self._tips_shown:      # tell once; the menu item stays
+            self._tips_shown.add(game["exe"])
+            _save_settings({"mod_tips_shown": sorted(self._tips_shown)})
+            self.icon.notify(f"{game['name']} can have adaptive triggers with a free mod. "
+                             "Right-click the tray icon to set it up.", APP)
+
+    def _open_mod_guide(self):
+        if self.mod_tip:
+            webbrowser.open(self.mod_tip["guide"])
 
     def _set_state(self, state):
         self.state = state
@@ -542,6 +603,8 @@ class TrayApp:
             threading.Thread(target=self.bt.run, daemon=True).start()
             threading.Thread(target=self._wait_for_quit_request, daemon=True).start()
             threading.Thread(target=self._update_loop, daemon=True).start()
+            if self.dsx_enabled:
+                self._start_dsx()
 
         self.icon.run(setup=setup)
 

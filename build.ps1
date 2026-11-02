@@ -11,6 +11,10 @@ python tests\test_usbip_device.py
 if ($LASTEXITCODE -ne 0) { throw "self-test failed" }
 python tests\test_shortcuts.py
 if ($LASTEXITCODE -ne 0) { throw "shortcut self-test failed" }
+python tests\test_dsx.py
+if ($LASTEXITCODE -ne 0) { throw "DSX self-test failed" }
+python tests\test_re4_mod.py   # skips unless lupa is installed
+if ($LASTEXITCODE -ne 0) { throw "RE4 script self-test failed" }
 
 # The version the app reports and compares with GitHub releases (see updater.py)
 Set-Content -Encoding ascii _build_version.py "VERSION = `"$Version`""

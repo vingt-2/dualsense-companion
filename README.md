@@ -20,6 +20,7 @@ virtual USB DualSense that looks like the real wired one, so those games enable 
 | Controller speaker | ✅ |
 | Controller microphone | ✅ |
 | Headphone jack | ✅ (stereo; the speaker goes quiet while headphones are in) |
+| Game mods that add adaptive triggers to games without them | ✅ no extra app needed |
 
 Tested with Assassin's Creed Mirage on Windows 11. Not affiliated with or endorsed by Sony.
 
@@ -103,7 +104,29 @@ Right-click the icon for:
   once a day, and tells you once per new version. *Update to x.y.z…* then appears at the top of the
   menu: it downloads the new installer, which closes the app, installs and starts the new version.
   Turn off *Check for updates automatically* to stop the checks; *Check now* checks right away.
+- **Game mods (adaptive triggers and lights from game mods)**, on by default: see
+  [Game mods](#game-mods). While a mod is active, the menu shows which one and its effects.
+  When you start a game that has a mod for this and it isn't installed, the menu offers
+  *Get adaptive triggers for …*, which opens its setup guide.
 - **Start with Windows**, **Open log**, **Quit**.
+
+### Game mods
+
+Many games on PC never got adaptive triggers, but mods add them, and DualSense Bridge plays
+them on your controller with no other app running.
+
+- **Resident Evil 4 (2023)**: this repository has its own mod, where guns fire when the trigger
+  wall breaks. Setup guide: [mods/re4-remake](mods/re4-remake/README.md). If you start the game
+  without it, the tray menu offers the guide.
+- **Other games** (Skyrim, Fallout 4, RDR2, GTA, …): trigger mods made for DualSenseX work as
+  they are. Install the mod as its page says, but skip DualSenseX and any helper app the mod
+  asks you to run: DualSense Bridge takes their place. If DualSenseX is running anyway, the
+  bridge leaves the mods to it.
+
+A mod's effects last until it resets them or its game exits. Nothing from any mod is
+redistributed or changed. Some mods use named trigger presets (*Soft*, *Hard*, *Choppy*, …)
+whose exact feel was never published; these use DualSenseY's values, so if one feels off,
+open an issue.
 
 ### Troubleshooting
 
@@ -200,6 +223,9 @@ To run from source instead: `pip install -r requirements.txt`, install usbip-win
 | `usbip_server.py` | Minimal USB/IP server |
 | `audio_default.py` | Restores Windows' default sound devices |
 | `updater.py` | Update check against the latest GitHub release, download and install |
+| `dsx.py` | Game mods: their UDP protocol, trigger effects and payload files |
+| `game_mods.py` | Games with a known trigger mod, for the tray's setup suggestion |
+| `mods/` | Game scripts that use it (Resident Evil 4 (2023)) |
 | `installer/` | Inno Setup script and the dependency downloader |
 
 ## Credits
@@ -213,6 +239,10 @@ To run from source instead: `pip install -r requirements.txt`, install usbip-win
 - [hidapi](https://github.com/trezor/cython-hidapi), [pystray](https://github.com/moses-palmer/pystray),
   [Pillow](https://python-pillow.org/), [PyInstaller](https://pyinstaller.org/).
 - The Linux `hid-playstation` driver, for the DualSense report layouts and rumble flags.
+- Game mods: the [Paliverse](https://github.com/Paliverse) DSX mod examples (the protocol),
+  [DualSenseY](https://github.com/WujekFoliarz/DualSenseY-v2) by WujekFoliarz (MIT; the trigger
+  preset values), Nielk1's TriggerEffectGenerator (MIT; the trigger effect encodings) and
+  [PadForge](https://github.com/hifihedgehog/PadForge)'s DSX-compatibility notes.
 
 ## License
 

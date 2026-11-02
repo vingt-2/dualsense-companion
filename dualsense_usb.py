@@ -7,6 +7,7 @@ import time
 import zlib
 from collections import deque
 
+from dsx import Overrides
 from haptics import HapticsConverter
 from media import MediaStreamer, MicStream, SpeakerStream, speaker_setup_output
 from usb_audio import AudioFunction
@@ -201,6 +202,10 @@ class WiredDualSense:
         self.audio = AudioFunction(on_haptics=self.haptics.feed, on_speaker=self.speaker.feed,
                                    mic=self.mic)
         bt.on_input = self._on_bt_input
+        # DSX game mods (dsx.py): their trigger and light settings, patched over the game's
+        self.dsx = Overrides(on_change=self._dsx_changed)
+        self._game_output = None        # the game's last output report 0x02
+        self._mac = (None, "")          # (HID path, MAC) for DSX replies
 
     def _speaker_stopped(self):
         history, total, _ = self.bt.link.snapshot()
@@ -295,6 +300,7 @@ class WiredDualSense:
 
     # -- input path -------------------------------------------------------
     def _on_bt_input(self, usb_report):
+        usb_report = self.dsx.filter_input(usb_report)   # DSX trigger thresholds
         with self._lock:
             self._latest = usb_report
             urb = self._pending_in.popleft() if self._pending_in else None
@@ -306,7 +312,29 @@ class WiredDualSense:
     def _output(self, data):
         if data and data[0] == 0x02:
             self._log_once("output", f"host sent first output report: {bytes(data[:12]).hex()}")
-            self.bt.write_usb_output(data)
+            self._game_output = bytes(data)
+            self.bt.write_usb_output(self.dsx.patch(data))
+
+    # -- DSX mods ---------------------------------------------------------
+    def _dsx_changed(self, cleared):
+        """A mod changed its effects: send them now rather than at the game's next report.
+        When they're all gone, triggers off, then the game's own last state back."""
+        self.bt.write_usb_output(self.dsx.own_report())
+        if cleared and self._game_output:
+            self.bt.write_usb_output(self.dsx.patch(self._game_output))
+
+    def dsx_status(self):
+        """What a DSX reply says about the controller."""
+        connected = getattr(self.bt, "dev", True) is not None
+        if not connected:
+            return {"connected": False}
+        level = self._latest[53] & 0x0F if len(self._latest) > 53 else 0   # 0-10, 10 % steps
+        path = getattr(self.bt, "path", None)
+        if self._mac[0] != path or not self._mac[1]:
+            info = self.bt.get_feature(0x09, 20)   # pairing info: MAC at bytes 1-6, LSB first
+            mac = ":".join(f"{b:02X}" for b in reversed(info[1:7])) if info and any(info[1:7]) else ""
+            self._mac = (path, mac)
+        return {"connected": True, "battery": min(100, level * 10), "mac": self._mac[1]}
 
     # -- control endpoint -------------------------------------------------
     def _control(self, urb):
