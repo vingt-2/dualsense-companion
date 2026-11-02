@@ -123,6 +123,9 @@ them on your controller with no other app running.
   wall breaks. Tray menu → *Game mods* → *Resident Evil 4* → *Install adaptive triggers…* sets it
   up in one click (it adds REFramework, the mod loader, if the game doesn't have it). Or by hand:
   [mods/re4-remake](mods/re4-remake/README.md).
+- **Resident Evil 7 biohazard**: the same, for the main game and the DLC episodes. Tray menu →
+  *Game mods* → *Resident Evil 7* → *Install adaptive triggers…*, or by hand:
+  [mods/re7](mods/re7/README.md).
 - **Other games** (Skyrim, Fallout 4, RDR2, GTA, …): trigger mods made for DualSenseX work as
   they are. Install the mod as its page says, but skip DualSenseX and any helper app the mod
   asks you to run: DualSense Bridge takes their place. If DualSenseX is running anyway, the

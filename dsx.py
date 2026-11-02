@@ -35,6 +35,7 @@ CURRENT_PORT_FILE = os.path.join(os.environ.get("LOCALAPPDATA", "."), "DSX",
 PAYLOAD_PATHS = [
     r"reframework\data\DualSenseX\payload.json",   # lunati_'s REFramework mods (RE4 Remake, ...)
     r"reframework\data\DualSenseBridge\re4_triggers.json",   # our RE4 Remake script (mods/re4-remake)
+    r"reframework\data\DualSenseBridge\re7_triggers.json",   # our RE7 script (mods/re7)
 ]
 
 # -- instructions -------------------------------------------------------------------------

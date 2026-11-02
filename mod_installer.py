@@ -66,6 +66,34 @@ def steam_game_folder(appid, libraries=None):
     return None
 
 
+def steam_branch(folder, appid):
+    """The Steam branch (beta) installed in a Steam game folder, or None for the default one.
+    Steam keeps it in the app manifest next to steamapps\\common: "BetaKey" under
+    MountedConfig (what's on disk) or UserConfig (what's selected)."""
+    steamapps = os.path.dirname(os.path.dirname(os.path.normpath(folder)))
+    try:
+        text = open(os.path.join(steamapps, f"appmanifest_{appid}.acf"), encoding="utf-8",
+                    errors="replace").read()
+    except OSError:
+        return None
+    for section in ("MountedConfig", "UserConfig"):
+        m = re.search(r'"%s"\s*\{([^}]*)\}' % section, text)
+        key = m and re.search(r'"BetaKey"\s+"([^"]*)"', m.group(1))
+        if key and key.group(1) and key.group(1).lower() != "public":
+            return key.group(1)
+    return None
+
+
+def reframework_source(game, folder):
+    """(repo, zip) of the REFramework build for the installed version of the game: the
+    game's "reframework" entry, or the one for its Steam branch (e.g. the old non-RT builds
+    of RE2/3/7 need their own zips)."""
+    branch = steam_branch(folder, game.get("steam_appid")) if game.get("steam_appid") else None
+    source = game.get("reframework_branches", {}).get(branch) if branch else None
+    source = source or game["reframework"]
+    return source["repo"], source["asset"], branch
+
+
 def is_installed(game, folder):
     return any(os.path.exists(os.path.join(folder, p)) for p in game["installed"])
 
@@ -123,12 +151,14 @@ def install(game, folder, get=_get, reframework=latest_reframework, log=print):
     done = []
     loader = os.path.join(folder, "dinput8.dll")
     if not os.path.exists(loader):
-        tag, url = reframework(game["reframework_asset"])
-        log(f"[mods] downloading REFramework {tag} ({game['reframework_asset']})")
+        repo, asset, branch = reframework_source(game, folder)
+        tag, url = reframework(asset, repo)
+        log(f"[mods] downloading REFramework {tag} ({repo} {asset}"
+            f"{', for the ' + branch + ' build' if branch else ''})")
         with zipfile.ZipFile(io.BytesIO(get(url))) as z:
             name = next((n for n in z.namelist() if n.lower().endswith("dinput8.dll")), None)
             if not name:
-                raise RuntimeError(f"{game['reframework_asset']} has no dinput8.dll")
+                raise RuntimeError(f"{asset} has no dinput8.dll")
             _write(loader, z.read(name))
         set_config(os.path.join(folder, REFRAMEWORK_CONFIG), QUIET_MENU)
         # remember that REFramework came from us, so uninstalling may take it away again

@@ -27,8 +27,8 @@ def main():
         downloads.append(url)
         return fake_zip() if url.endswith(".zip") else b"-- the trigger script"
 
-    def reframework(asset):
-        assert asset == "RE4.zip"
+    def reframework(asset, repo="praydog/REFramework"):
+        assert asset == "RE4.zip" and repo == "praydog/REFramework", (asset, repo)
         return "v9", "https://example.invalid/RE4.zip"
 
     # a fresh game with another trigger mod: loader added, old mod set aside, script added
@@ -106,6 +106,32 @@ def main():
     done = mod_installer.uninstall(GAME, fresh, log=lambda s: None)
     assert done == ["removed the adaptive-trigger script"], done
     assert open(os.path.join(fresh, "dinput8.dll"), "rb").read() == b"theirs"
+
+    # the REFramework build follows the installed Steam branch
+    lib = tempfile.mkdtemp()
+    game_dir = os.path.join(lib, "steamapps", "common", "Game")
+    os.makedirs(game_dir)
+    entry = {"steam_appid": 418370,
+             "reframework": {"repo": "praydog/REFramework-nightly", "asset": "REFramework.zip"},
+             "reframework_branches": {"dx11_non-rt": {"repo": "praydog/REFramework",
+                                                      "asset": "RE7_TDB49.zip"}}}
+    manifest = os.path.join(lib, "steamapps", "appmanifest_418370.acf")
+    def write_manifest(beta):
+        config = f'\t\t"BetaKey"\t\t"{beta}"\n' if beta else ""
+        with open(manifest, "w") as f:
+            f.write('"AppState"\n{\n\t"appid"\t\t"418370"\n\t"UserConfig"\n\t{\n'
+                    '\t\t"language"\t\t"english"\n' + config + '\t}\n\t"MountedConfig"\n\t{\n'
+                    '\t\t"language"\t\t"english"\n' + config + '\t}\n}\n')
+    write_manifest(None)
+    assert mod_installer.reframework_source(entry, game_dir) == \
+        ("praydog/REFramework-nightly", "REFramework.zip", None)
+    write_manifest("dx11_non-rt")
+    assert mod_installer.reframework_source(entry, game_dir) == \
+        ("praydog/REFramework", "RE7_TDB49.zip", "dx11_non-rt")
+    write_manifest("some_other_beta")             # unknown branch: the game's default
+    assert mod_installer.reframework_source(entry, game_dir)[1] == "REFramework.zip"
+    # the real RE7 on this kind of PC (no BetaKey) and a folder outside Steam
+    assert mod_installer.steam_branch(tempfile.mkdtemp(), 418370) is None
 
     # Steam: the app manifest says where the game is
     lib = tempfile.mkdtemp()

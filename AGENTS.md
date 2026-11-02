@@ -69,7 +69,11 @@ changes; you only write a mod for games that have none, or whose mod is broken.
    there), `data` (the mod's own data folder, removed on uninstall; the installer also keeps its
    "we installed REFramework" marker there), `guide` (URL of the mod's README), `about` (a plain-language "how it works" for the
    tray's per-game submenu; no jargon), and for the one-click install `steam_appid`,
-   `reframework_asset` (the zip name in praydog/REFramework's latest release), `files`
+   `reframework` (`{"repo", "asset"}`: the REFramework zip for the game's current build; see the
+   comment in `game_mods.py` for stable vs nightly) and, if Steam branches need other builds,
+   `reframework_branches` (`{branch: {"repo", "asset"}}`, e.g. RE2/3/7's `dx11_non-rt` ->
+   `RE2_TDB66.zip`/`RE3_TDB67.zip`/`RE7_TDB49.zip` from stable; the installer reads the installed
+   branch from the Steam app manifest's `BetaKey`), `files`
    (`{path in game folder: raw.githubusercontent URL on main}`) and `conflicts` (other mods'
    files to move aside). `mod_installer.install` assumes an REFramework game (it installs
    `dinput8.dll` only when missing, then sets REFramework to keep its menu closed and leaves a
@@ -100,6 +104,13 @@ changes; you only write a mod for games that have none, or whose mod is broken.
   `get_EquipWeaponID()`. Loaded ammo: `chainsaw.InventoryManager._ControllerTable` values ->
   the `chainsaw.CsInventoryController` -> `getEquippedWeapon()` -> `get_CurrentAmmoCount()`.
   Weapon IDs -> classes: the table in the script (from Advanced Weapon Framework's data).
+- RE7 facts (probe, 2026-11-01; same in the main game and *Not a Hero*):
+  `app.InteractManager._PlayerStatus` (a field) -> `EquipManager` -> `get_equipWeaponItemIDRight()`
+  (the item ID as a string: `Handgun_G17`, `Shotgun_Albert`, `CKnife`, ...) and
+  `get_equipWeaponRight():get_loadNum()` (loaded rounds). Classes come from the item ID's name.
+  Not a Hero has its own inventory (`app.CH8Inventory`) and item IDs; main-game items can't be
+  equipped there. The probe used is kept outside git (`build/probes/`); its approach (read fields
+  as well as getters, start from known objects, log scan errors) is what worked.
 
 ## Hidden options
 

@@ -35,12 +35,51 @@ GAMES = [
             "reframework\\autorun\\dualsense_bridge_re4.lua in the game folder."),
         # for the automatic install (mod_installer.py)
         "steam_appid": 2050650,
-        "reframework_asset": "RE4.zip",
+        # REFramework for the installed build: {"repo": GitHub repo, "asset": zip in its
+        # latest release}. Stable praydog/REFramework works with RE4's current build (checked
+        # 2026-11-01: same dinput8.dll as a working install). For games whose current patch
+        # needs newer builds use {"repo": "praydog/REFramework-nightly", "asset":
+        # "REFramework.zip"} (one zip for every game, but no old non-RT builds); Steam
+        # branches with their own zip go in "reframework_branches", e.g.
+        # {"dx11_non-rt": {"repo": "praydog/REFramework", "asset": "RE7_TDB49.zip"}}.
+        "reframework": {"repo": "praydog/REFramework", "asset": "RE4.zip"},
         "files": {r"reframework\autorun\dualsense_bridge_re4.lua":
                   f"{RAW}/mods/re4-remake/reframework/autorun/dualsense_bridge_re4.lua"},
         # other trigger mods for this game, moved aside so they don't fight over the triggers
         "conflicts": [r"reframework\autorun\DualsenseX.lua", r"reframework\autorun\DualsenseX",
                       r"reframework\data\DualSenseX"],
+    },
+    {
+        "exe": "re7.exe",
+        "name": "Resident Evil 7",
+        "installed": [r"reframework\autorun\dualsense_bridge_re7.lua"],
+        "data": r"reframework\data\DualSenseBridge",
+        "guide": f"{REPO}/tree/main/mods/re7#readme",
+        "about": (
+            "Resident Evil 7 on PC has no adaptive triggers. This mod adds them, in the main "
+            "game and the DLC episodes.\n\n"
+            "•  A small script runs inside the game through REFramework, a widely used mod "
+            "loader for Capcom's games. Several times a second it checks which weapon you're "
+            "holding and how many rounds are loaded.\n\n"
+            "•  Each kind of weapon gets its own trigger feel: handguns, shotguns, the 44 MAG, "
+            "the machine gun, the burner, the grenade launcher, knives, saws and throwables. "
+            "The lightbar takes the weapon's colour.\n\n"
+            "•  The script writes that feel to a small file in the game folder. DualSense "
+            "Bridge follows the file and plays it on your controller's triggers.\n\n"
+            "•  Guns have a trigger wall that gives way, like a real trigger, and the bridge "
+            "only lets the game see the trigger once it's past the wall, so the shot fires at "
+            "the break. An empty gun gets a light click instead. In menus and cutscenes the "
+            "triggers go back to normal.\n\n"
+            "The mod only reads the game, it doesn't change it. To remove it, delete "
+            "reframework\\autorun\\dualsense_bridge_re7.lua in the game folder."),
+        "steam_appid": 418370,
+        # stable works with RE7's current (ray-traced) build: checked 2026-11-01
+        "reframework": {"repo": "praydog/REFramework", "asset": "RE7.zip"},
+        "reframework_branches": {
+            "dx11_non-rt": {"repo": "praydog/REFramework", "asset": "RE7_TDB49.zip"}},
+        "files": {r"reframework\autorun\dualsense_bridge_re7.lua":
+                  f"{RAW}/mods/re7/reframework/autorun/dualsense_bridge_re7.lua"},
+        "conflicts": [],
     },
 ]
 

@@ -19,6 +19,8 @@ python tests\test_tray_menu.py
 if ($LASTEXITCODE -ne 0) { throw "tray menu self-test failed" }
 python tests\test_re4_mod.py   # skips unless lupa is installed
 if ($LASTEXITCODE -ne 0) { throw "RE4 script self-test failed" }
+python tests\test_re7_mod.py   # skips unless lupa is installed
+if ($LASTEXITCODE -ne 0) { throw "RE7 script self-test failed" }
 
 # The version the app reports and compares with GitHub releases (see updater.py)
 Set-Content -Encoding ascii _build_version.py "VERSION = `"$Version`""
