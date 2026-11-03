@@ -20,18 +20,20 @@ local POLL = 0.1                                       -- s between checks of th
 
 -- Trigger feel per weapon class. l2/r2 = {mode, params...}; fire = R2 threshold.
 -- Tune here, or override any class in reframework/data/DualSenseBridge/re4_config.json.
+-- Tuned side by side with the PS5 version: aim (L2) is almost free except on launchers, and
+-- the rocket launcher has the strongest wall.
 local PROFILES = {
     none     = { l2 = {0},           r2 = {0},           fire = 0,   rgb = nil },
-    handgun  = { l2 = {13, 0, 3},    r2 = {22, 3, 6, 8}, fire = 190, rgb = {0, 120, 255} },
-    shotgun  = { l2 = {13, 0, 5},    r2 = {22, 3, 7, 8}, fire = 205, rgb = {255, 50, 30} },
-    rifle    = { l2 = {13, 0, 5},    r2 = {22, 2, 5, 7}, fire = 165, rgb = {255, 220, 0} },
-    magnum   = { l2 = {13, 0, 6},    r2 = {22, 4, 8, 8}, fire = 225, rgb = {170, 0, 255} },
-    smg      = { l2 = {13, 0, 2},    r2 = {23, 3, 5, 15}, fire = 0,  rgb = {255, 130, 0} },
-    bow      = { l2 = {13, 0, 5},    r2 = {22, 5, 8, 6}, fire = 230, rgb = {0, 255, 255} },
-    launcher = { l2 = {13, 0, 7},    r2 = {22, 5, 8, 8}, fire = 230, rgb = {255, 0, 80} },
-    knife    = { l2 = {13, 0, 1},    r2 = {0},           fire = 0,   rgb = {255, 255, 255} },
-    throw    = { l2 = {13, 0, 4},    r2 = {13, 0, 3},    fire = 0,   rgb = {0, 255, 60} },
-    other    = { l2 = {13, 0, 2},    r2 = {0},           fire = 0,   rgb = nil },
+    handgun  = { l2 = {0},           r2 = {22, 3, 6, 1}, fire = 190, rgb = {0, 120, 255} },
+    shotgun  = { l2 = {13, 0, 1},    r2 = {22, 3, 7, 5}, fire = 205, rgb = {255, 50, 30} },
+    rifle    = { l2 = {13, 0, 1},    r2 = {22, 2, 5, 5}, fire = 165, rgb = {255, 220, 0} },
+    magnum   = { l2 = {0},           r2 = {22, 3, 7, 5}, fire = 205, rgb = {170, 0, 255} },
+    smg      = { l2 = {13, 7, 1},    r2 = {23, 3, 5, 15}, fire = 0,  rgb = {255, 130, 0} },
+    bow      = { l2 = {13, 0, 1},    r2 = {22, 5, 8, 6}, fire = 230, rgb = {0, 255, 255} },
+    launcher = { l2 = {13, 0, 6},    r2 = {22, 5, 8, 8}, fire = 230, rgb = {255, 0, 80} },
+    knife    = { l2 = {0},           r2 = {0},           fire = 0,   rgb = {255, 255, 255} },
+    throw    = { l2 = {13, 0, 1},    r2 = {13, 0, 3},    fire = 0,   rgb = {0, 255, 60} },
+    other    = { l2 = {13, 0, 1},    r2 = {0},           fire = 0,   rgb = nil },
 }
 -- A gun with an empty magazine: a light, early click, so the dry fire registers at once.
 local EMPTY_R2 = {22, 2, 4, 3}

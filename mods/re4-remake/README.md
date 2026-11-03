@@ -8,7 +8,9 @@ Resident Evil 4 (2023) its own adaptive-trigger feel on a DualSense, played thro
   trigger once it's past the wall, so the shot goes off at the break like a real trigger instead
   of before you reach the resistance.
 - Each class feels different: pistols, shotguns, rifles, magnums, SMGs, the bolt thrower and
-  launchers. Knives have a light L2 and no R2 resistance.
+  launchers. Tuned side by side with the PS5 version: aiming is nearly free (pistols and
+  magnums not at all), except the launchers, which are heavy; pistols have a light wall and
+  the rocket launcher the strongest. Knives have no resistance.
 - An empty gun gets a light, early click.
 - The lightbar takes a colour per weapon class (can be turned off).
 - In menus and cutscenes the triggers go back to normal.

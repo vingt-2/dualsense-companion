@@ -98,8 +98,8 @@ def main():
     # pistol: Weapon wall 3-6 at force 8, fire point 190, blue
     o = effects(4000, 10)
     assert written()[0] == (7, [0]), "every payload starts clean"
-    assert o.r2 == dsx.encode_trigger(22, [3, 6, 8]) and o.thresholds[dsx.R2] == 190, o.thresholds
-    assert o.l2 == dsx.encode_trigger(13, [0, 3]) and o.rgb == (0, 120, 255)
+    assert o.r2 == dsx.encode_trigger(22, [3, 6, 1]) and o.thresholds[dsx.R2] == 190, o.thresholds
+    assert o.l2 == dsx.OFF and o.rgb == (0, 120, 255)
     # empty magazine: light early click, no fire point
     o = effects(ammo=0)
     assert o.r2 == dsx.encode_trigger(22, [2, 4, 3]) and o.thresholds[dsx.R2] == 0
@@ -107,7 +107,7 @@ def main():
     assert effects(4100, 5).thresholds[dsx.R2] == 205
     o = effects(4600, 1)
     assert o.r2 == dsx.encode_trigger(22, [5, 8, 6]) and o.thresholds[dsx.R2] == 230
-    assert effects(4502, 3).r2 == dsx.encode_trigger(22, [4, 8, 8])
+    assert effects(4502, 3).r2 == dsx.encode_trigger(22, [3, 7, 5])
     # extras outside their family: Skull Shaker is a shotgun, Sentinel Nine a pistol
     assert effects(6001, 2).thresholds[dsx.R2] == 205
     assert effects(6000, 9).thresholds[dsx.R2] == 190
@@ -120,7 +120,7 @@ def main():
     assert o.r2 == dsx.OFF and o.thresholds[dsx.R2] == 0 and o.rgb == (255, 255, 255)
     # unknown weapon: light L2, nothing else
     o = effects(5814)
-    assert o.l2 == dsx.encode_trigger(13, [0, 2]) and o.r2 == dsx.OFF and o.rgb is None
+    assert o.l2 == dsx.encode_trigger(13, [0, 1]) and o.r2 == dsx.OFF and o.rgb is None
     # every class's effects must be ones the bridge accepts (an invalid one would be dropped)
     for weapon in (4000, 6000, 4100, 4200, 4400, 4500, 4600, 4900, 5000, 5400, 6103, 6107):
         for ammo in (5, 0):
