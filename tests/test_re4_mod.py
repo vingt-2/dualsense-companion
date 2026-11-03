@@ -1,5 +1,5 @@
 """Runs the RE4 Remake script (mods/re4-remake) against a stand-in for REFramework and checks
-what it writes, then feeds that to the bridge's parser. Needs lupa (pip install lupa):
+what it writes, then feeds that to the app's parser. Needs lupa (pip install lupa):
 python tests\\test_re4_mod.py"""
 import json
 import os
@@ -15,25 +15,33 @@ except ImportError:
 import dsx
 
 SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "mods", "re4-remake",
-                      "reframework", "autorun", "dualsense_bridge_re4.lua")
+                      "reframework", "autorun", "dualsense_companion_re4.lua")
 
 # A minimal REFramework: one player whose weapon and loaded ammo the test sets.
 FAKE_REFRAMEWORK = r"""
-world = { weapon = 4000, ammo = 10, player = true, t = 0 }
+world = { weapon = 4000, ammo = 10, player = true, t = 0, hp = 1200, max_hp = 1200 }
 local hooks = {}
 re = { on_frame = function(f) hooks.frame = f end,
        on_script_reset = function(f) hooks.reset = f end,
        on_draw_ui = function(f) hooks.ui = f end }
 os.clock = function() return world.t end
 log = { info = function() end }
-json = { load_file = function() return nil end, dump_file = function() end }
+json = { load_file = function() return saved_config end, dump_file = function() end }
 imgui = { tree_node = function() return false end }
 -- the player: CharacterManager -> context -> head object -> PlayerEquipment
 local equipment = { call = function(self, name) return world.weapon end }
 local head = { call = function(self, m, t)
     if m == "getComponent(System.Type)" then return t == "chainsaw.PlayerEquipment" and equipment or nil end
   end }
-local context = { call = function(self, m) if m == "get_HeadGameObject" then return head end end }
+-- the player's health: the context's HitPoint (current / default hit points)
+local hit_point = { call = function(self, m)
+    if m == "get_CurrentHitPoint" then return world.hp end
+    if m == "get_DefaultHitPoint" then return world.max_hp end
+  end }
+local context = { call = function(self, m)
+    if m == "get_HeadGameObject" then return head end
+    if m == "get_HitPoint" then return hit_point end
+  end }
 local character_manager = { call = function() return world.player and context or nil end }
 -- the ammo: InventoryManager._ControllerTable -> CsInventoryController -> equipped weapon
 local weapon_item = { call = function(self, m) if m == "get_CurrentAmmoCount" then return world.ammo end end }
@@ -68,15 +76,45 @@ function script_reset() hooks.reset() end
 """
 
 
-def main():
+def start(config=None):
+    """A fresh game with the script loaded; config is what re4_config.json holds."""
     work = tempfile.mkdtemp()
-    os.makedirs(os.path.join(work, "DualSenseBridge"))
+    os.makedirs(os.path.join(work, "DualSenseCompanion"))
     os.chdir(work)                        # REFramework resolves io paths in reframework/data
     L = lupa.LuaRuntime()
     L.execute(FAKE_REFRAMEWORK)
+    if config is not None:
+        L.globals().saved_config = L.table_from(config)
     L.execute(open(SCRIPT, encoding="utf-8").read())
+    return L, work
+
+
+def health_lightbar():
+    """By default the lightbar shows health, as on PS5: green, yellow, orange, red."""
+    L, work = start()
     world = L.globals().world
-    out = os.path.join(work, "DualSenseBridge", "re4_triggers.json")
+    out = os.path.join(work, "DualSenseCompanion", "re4_triggers.json")
+
+    def rgb(hp):
+        world.hp = hp
+        L.globals().step()
+        o = dsx.Overrides()
+        o.apply(dsx.parse(open(out, encoding="ascii").read()), "re4")
+        return o.rgb
+
+    assert rgb(1200) == (0, 255, 40)          # fine
+    assert rgb(700) == (255, 200, 0)          # caution
+    assert rgb(400) == (255, 90, 0)           # caution, lower
+    assert rgb(100) == (255, 0, 0)            # danger
+    assert rgb(0) == (255, 0, 0)
+
+
+def main():
+    health_lightbar()
+    # the rest checks the weapon colours too: the lightbar per weapon, as set in the menu
+    L, work = start({"lightbar_health": False})
+    world = L.globals().world
+    out = os.path.join(work, "DualSenseCompanion", "re4_triggers.json")
 
     def written():
         with open(out, encoding="ascii") as f:
@@ -121,7 +159,7 @@ def main():
     # unknown weapon: light L2, nothing else
     o = effects(5814)
     assert o.l2 == dsx.encode_trigger(13, [0, 1]) and o.r2 == dsx.OFF and o.rgb is None
-    # every class's effects must be ones the bridge accepts (an invalid one would be dropped)
+    # every class's effects must be ones the app accepts (an invalid one would be dropped)
     for weapon in (4000, 6000, 4100, 4200, 4400, 4500, 4600, 4900, 5000, 5400, 6103, 6107):
         for ammo in (5, 0):
             o = effects(weapon, ammo)
@@ -133,7 +171,8 @@ def main():
     effects(4000, 10)
     L.globals().script_reset()
     assert written() == [(7, [0])]
-    print("OK: RE4 script writes the expected trigger payloads for each weapon class")
+    print("OK: RE4 script writes the expected trigger payloads for each weapon class, "
+          "and the lightbar shows health")
 
 
 if __name__ == "__main__":

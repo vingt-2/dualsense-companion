@@ -1,15 +1,15 @@
--- DualSense Bridge: test weapons for Resident Evil 4 (2023)
+-- DualSense Companion: test weapons for Resident Evil 4 (2023)
 -- A testing helper for the adaptive-trigger script: puts one of every weapon (and some ammo)
 -- into the storage you reach from any typewriter. Weapons you already own are skipped:
 -- storage merges duplicate weapons, which would undo the upgrades on the copy you carry.
 --
 -- Install: copy into reframework\autorun. Use: REFramework menu (Insert) →
--- "DualSense Bridge: test weapons". Remove it again when you're done testing.
+-- "DualSense-Companion: test weapons". Remove it again when you're done testing.
 --
 -- Item creation via chainsaw.ChainsawGuiUtil.generateItem and storage via
 -- chainsaw.ArmouryManager.addArmouryItem, as documented by the RE4R Archipelago project
 -- (github.com/LiterallyMetaphorical/RE4R-AP-Wizard, MIT), which credits chenstack's item_adder.
--- MIT licence, like the rest of DualSense Bridge.
+-- MIT licence, like the rest of DualSense Companion.
 
 -- Weapon item IDs: 274835456 + 1600 x (weapon number - 4000), e.g. wp4100 W-870.
 local WEAPONS = {
@@ -78,11 +78,11 @@ local function give(list, to_id, skip_owned, count_of)
     end
     status = string.format("Added %d, already owned %d%s", added, skipped,
         #failed > 0 and (", failed: " .. table.concat(failed, ", ")) or "")
-    log.info("[DualSense Bridge test weapons] " .. status)
+    log.info("[DualSense Companion test weapons] " .. status)
 end
 
 re.on_draw_ui(function()
-    if not imgui.tree_node("DualSense Bridge: test weapons") then return end
+    if not imgui.tree_node("DualSense-Companion: test weapons") then return end
     imgui.text("Adds to storage (take them out at any typewriter).")
     if imgui.button("Every weapon") then
         give(WEAPONS, function(w) return item_id(w[2]) end, true)

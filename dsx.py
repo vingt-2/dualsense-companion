@@ -1,6 +1,6 @@
 """Stand-in for DualSenseX (DSX), so DSX game mods drive the triggers and lights.
 
-Mods talk to DSX in one of two ways, and the bridge answers both:
+Mods talk to DSX in one of two ways, and the app answers both:
   * UDP JSON to 127.0.0.1:6969, with a reply to every packet (DsxServer);
   * a payload file written next to the game for a helper exe to forward (PayloadWatcher).
 
@@ -34,9 +34,16 @@ CURRENT_PORT_FILE = os.path.join(os.environ.get("LOCALAPPDATA", "."), "DSX",
 # A new mod is one more line here.
 PAYLOAD_PATHS = [
     r"reframework\data\DualSenseX\payload.json",   # lunati_'s REFramework mods (RE4 Remake, ...)
-    r"reframework\data\DualSenseBridge\re4_triggers.json",   # our RE4 Remake script (mods/re4-remake)
-    r"reframework\data\DualSenseBridge\re7_triggers.json",   # our RE7 script (mods/re7)
+    r"reframework\data\DualSenseCompanion\re4_triggers.json",   # our RE4 Remake script (mods/re4-remake)
+    r"reframework\data\DualSenseCompanion\re7_triggers.json",   # our RE7 script (mods/re7)
+    r"reframework\data\DualSenseCompanion\re2_triggers.json",   # our RE2 script (mods/re2)
+    r"reframework\data\DualSenseCompanion\re3_triggers.json",   # our RE3 script (mods/re3)
+    r"reframework\data\DualSenseCompanion\re8_triggers.json",   # our Village script (mods/re8)
 ]
+# Our scripts from before the rename (DualSense Bridge): still followed, so an existing
+# install keeps working until the app moves it over (mod_installer.migrate).
+PAYLOAD_PATHS += [p.replace("DualSenseCompanion", "DualSenseBridge") for p in PAYLOAD_PATHS
+                  if "DualSenseCompanion" in p]
 
 # -- instructions -------------------------------------------------------------------------
 GET_STATUS, TRIGGER, RGB, PLAYER_LED, THRESHOLD, MIC_LED, PLAYER_LED_NEW, RESET = range(8)
@@ -747,6 +754,17 @@ class DsxServer:
 
 
 # -- payload files ---------------------------------------------------------------------------
+def controller_seen(data):
+    """Our scripts' "controllerSeen" (whether the game sees any controller), or None."""
+    try:
+        root = json.loads(bytes(data).decode("utf-8", "replace").strip("\0 \t\r\n\ufeff"))
+    except ValueError:
+        return None
+    value = _key(root, "controllerseen") if isinstance(root, dict) else None
+    return value if isinstance(value, bool) else None
+
+
+
 class PayloadWatcher:
     """Finds running games with a known mod payload file next to them and applies it."""
 
@@ -754,8 +772,12 @@ class PayloadWatcher:
     POLL = 0.05      # s between checks of a watched file
 
     def __init__(self, overrides, processes=list_processes, path_of=process_path,
-                 alive=process_alive, paths=PAYLOAD_PATHS, on_process=None):
+                 alive=process_alive, paths=PAYLOAD_PATHS, on_process=None,
+                 on_controller_seen=None):
         self.overrides = overrides
+        # called with (source, exe file name, seen): our game scripts report whether the game
+        # sees a controller at all ("controllerSeen" in their payload)
+        self.on_controller_seen = on_controller_seen
         self.on_process = on_process   # called with (pid, exe path) for each new process
         self._processes, self._path_of, self._alive, self._paths = processes, path_of, alive, paths
         self._stop = threading.Event()
@@ -833,6 +855,12 @@ class PayloadWatcher:
                         announced.add(path)
                         print(f"[mods] mod connected: {source} ({path})")
                     self.overrides.apply(instructions, source)
+                    seen = controller_seen(data)
+                    if seen is not None and self.on_controller_seen:
+                        try:
+                            self.on_controller_seen(source, source.split(" ")[0], seen)
+                        except Exception as e:
+                            print(f"[mods] controller check failed: {e}")
                 self._stop.wait(self.POLL)
         finally:
             self._watching.discard(pid)

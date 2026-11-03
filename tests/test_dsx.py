@@ -225,6 +225,17 @@ def test_udp():
         assert {"TimeReceived", "IsSupportLightBar", "IsSupportPlayerLED", "IsSupportMicLED"} <= \
             set(reply) | set(d)
         send(b"garbage")                      # still answered
+        # Bluetooth: before the first colour on a connection, the lightbar is handed over
+        bt.outputs.clear()
+        send(packet((2, 0, 0, 255, 40)))
+        setup, colour = bt.outputs[-2], bt.outputs[-1]
+        assert setup[0] == 0x02 and setup[39] == 0x02 and setup[42] == 0x02, setup.hex()
+        assert not any(setup[1:39]) and setup[45:48] == bytes(3), setup.hex()
+        assert colour[2] & 0x04 and colour[45:48] == bytes([0, 255, 40]), colour.hex()
+        bt.outputs.clear()
+        send(packet((2, 0, 255, 0, 0)))       # only once per connection
+        assert len(bt.outputs) == 1 and bt.outputs[0][45:48] == bytes([255, 0, 0])
+        send(packet((7, 0)))
         for weapon, instructions in RE4.items():
             bt.outputs.clear()
             send(packet(*instructions))
@@ -329,8 +340,25 @@ def test_payload_file():
     w.scan()
     assert started and started[0][0] == fresh, started
 
+    # our scripts' "controllerSeen" reaches the tray with the game's exe name
+    told = []
+    o = dsx.Overrides()
+    running.set()
+    w = dsx.PayloadWatcher(o, on_controller_seen=lambda src, exe, seen: told.append((exe, seen)))
+    t = threading.Thread(target=w.watch, args=(game, "re7.exe (payload file)", running.is_set))
+    t.start()
+    try:
+        time.sleep(0.15)
+        with open(payload, "w") as f:
+            f.write('{"instructions":[{"type":7,"parameters":[0]}],"controllerSeen":false}')
+        time.sleep(0.25)
+    finally:
+        running.clear()
+        t.join(2)
+    assert ("re7.exe", False) in told, told
+
     # two mods' files in one game: both are followed
-    ours = os.path.join(game, "reframework", "data", "DualSenseBridge")
+    ours = os.path.join(game, "reframework", "data", "DualSenseCompanion")
     os.makedirs(ours)
     o = dsx.Overrides()
     running.set()
@@ -356,7 +384,7 @@ def test_game_suggestions():
     assert game_mods.suggestion(os.path.join(game, "other.exe")) is None
     autorun = os.path.join(game, "reframework", "autorun")
     os.makedirs(autorun)
-    open(os.path.join(autorun, "dualsense_bridge_re4.lua"), "w").close()
+    open(os.path.join(autorun, "dualsense_companion_re4.lua"), "w").close()
     assert game_mods.suggestion(exe) is None                          # installed: quiet
     # the payload watcher's scan reports each new process once
     seen = []
@@ -385,6 +413,13 @@ def test_port_files():
     assert open(current).read() == "6969"
 
 
+def test_legacy_payload_paths():
+    """Our scripts from before the rename (DualSense Bridge) are still followed."""
+    for key in ("re4", "re7", "re2", "re3", "re8"):
+        assert "reframework\\data\\DualSenseCompanion\\%s_triggers.json" % key in dsx.PAYLOAD_PATHS
+        assert "reframework\\data\\DualSenseBridge\\%s_triggers.json" % key in dsx.PAYLOAD_PATHS
+
+
 def main():
     test_encoding()
     test_parsing()
@@ -395,6 +430,7 @@ def main():
     test_payload_file()
     test_game_suggestions()
     test_port_files()
+    test_legacy_payload_paths()
     print("OK: DSX trigger encoding, parsing, UDP replies and overrides, payload files, "
           "port files and thresholds all pass")
 

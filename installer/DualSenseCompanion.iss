@@ -1,5 +1,5 @@
-; Inno Setup script for DualSense Bridge.
-; Build: run build.ps1 from the repo root (or: ISCC.exe installer\DualSenseBridge.iss).
+; Inno Setup script for DualSense Companion.
+; Build: run build.ps1 from the repo root (or: ISCC.exe installer\DualSenseCompanion.iss).
 ;
 ; usbip-win2 and HidHide are not bundled: if missing, setup downloads the latest
 ; official release of each from GitHub and runs its own installer.
@@ -7,10 +7,14 @@
 #ifndef AppVersion
   #define AppVersion "1.0.0"
 #endif
-#define AppName "DualSense Bridge"
-#define AppExe "DualSenseBridge.exe"
-#define RepoUrl "https://github.com/vingt-2/dualsense-bridge"
-#define TaskName "DualSenseBridge"
+#define AppName "DualSense Companion"
+#define AppExe "DualSenseCompanion.exe"
+#define RepoUrl "https://github.com/vingt-2/dualsense-companion"
+#define TaskName "DualSenseCompanion"
+; Before the rename: DualSense Bridge. Same AppId, so this installer upgrades it; its folder,
+; shortcuts and exe are cleaned up below (the app moves its settings and startup task).
+#define OldAppName "DualSense Bridge"
+#define OldAppExe "DualSenseBridge.exe"
 
 [Setup]
 AppId={{DC3D5EF8-354C-4E70-8E3B-DE9A2B00423F}
@@ -20,11 +24,14 @@ AppPublisher=vingt-2
 AppPublisherURL={#RepoUrl}
 AppSupportURL={#RepoUrl}/issues
 DefaultDirName={autopf}\{#AppName}
+; not the old "DualSense Bridge" folder an upgrade would otherwise reuse
+UsePreviousAppDir=no
+UsePreviousGroup=no
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 LicenseFile=..\LICENSE
 OutputDir=..\dist
-OutputBaseFilename=DualSenseBridge-Setup-{#AppVersion}
+OutputBaseFilename=DualSenseCompanion-Setup-{#AppVersion}
 SetupIconFile=..\icon.ico
 UninstallDisplayIcon={app}\{#AppExe}
 PrivilegesRequired=admin
@@ -143,17 +150,30 @@ begin
   Exec(OutFile, '', '', SW_SHOW, ewWaitUntilTerminated, ResultCode);
 end;
 
+// DualSense Bridge's leftovers, once DualSense Companion is in place.
+procedure RemoveOldApp;
+var
+  OldDir: String;
+begin
+  OldDir := ExpandConstant('{autopf}\{#OldAppName}');
+  if CompareText(OldDir, ExpandConstant('{app}')) <> 0 then
+    DelTree(OldDir, True, True, True);
+  DelTree(ExpandConstant('{autoprograms}\{#OldAppName}'), True, True, True);
+  DeleteFile(ExpandConstant('{autodesktop}\{#OldAppName}.lnk'));
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
   begin
+    RemoveOldApp;
     if not UsbipInstalled or not HidHideInstalled then
       ExtractTemporaryFile('get-latest-release.ps1');
     if not UsbipInstalled then
     begin
       InstallDependency('usbip-win2', 'vadimgrn/usbip-win2', 'USBip-*-x64.exe', 'usbip-win2-setup.exe');
       if not UsbipInstalled then
-        MsgBox('usbip-win2 was not installed. DualSense Bridge needs it to create the virtual wired controller.' + #13#10 +
+        MsgBox('usbip-win2 was not installed. DualSense Companion needs it to create the virtual wired controller.' + #13#10 +
           'Get it from https://github.com/vadimgrn/usbip-win2/releases/latest', mbInformation, MB_OK);
     end;
     if not HidHideInstalled then
@@ -186,6 +206,12 @@ begin
   Exe := ExpandConstant('{app}\{#AppExe}');
   if FileExists(Exe) then
     Exec(Exe, '--quit', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  // DualSense Bridge, when this upgrades it: it quits cleanly too (un-hides the controller)
+  Exe := ExpandConstant('{autopf}\{#OldAppName}\{#OldAppExe}');
+  if FileExists(Exe) then
+    Exec(Exe, '--quit', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM {#AppExe}', '', SW_HIDE,
+       ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM {#OldAppExe}', '', SW_HIDE,
        ewWaitUntilTerminated, ResultCode);
 end;

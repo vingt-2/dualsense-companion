@@ -1,14 +1,14 @@
--- DualSense Bridge: test weapons for Resident Evil 7 biohazard
+-- DualSense Companion: test weapons for Resident Evil 7 biohazard
 -- A testing helper for the adaptive-trigger work: puts every weapon (and some ammo) into the
 -- item box, which you open at any save-room box. It's a cheat, for testing only; remove it
 -- when you're done.
 --
 -- Install: copy into reframework\autorun. Use: REFramework menu (Insert) ->
--- Script Generated UI -> "DualSense Bridge: test weapons (RE7)".
+-- Script Generated UI -> "DualSense-Companion: test weapons (RE7)".
 --
 -- Game facts (item IDs; the player via app.ObjectManager.PlayerObj, its app.Inventory and the
 -- item box's addItem) as documented by the RE7 Archipelago client
--- (github.com/ElGrenier/RE7_AP_Client, MIT). MIT licence, like the rest of DualSense Bridge.
+-- (github.com/ElGrenier/RE7_AP_Client, MIT). MIT licence, like the rest of DualSense Companion.
 
 local WEAPONS = {
     { "G17 Handgun", "Handgun_G17" }, { "M19 Handgun", "Handgun_M19" },
@@ -81,11 +81,11 @@ local function give(list, default_count)
     end
     status = string.format("Added %d to the item box%s", added,
         #failed > 0 and (", failed: " .. table.concat(failed, ", ")) or "")
-    log.info("[DualSense Bridge test weapons] " .. status)
+    log.info("[DualSense Companion test weapons] " .. status)
 end
 
 re.on_draw_ui(function()
-    if not imgui.tree_node("DualSense Bridge: test weapons (RE7)") then return end
+    if not imgui.tree_node("DualSense-Companion: test weapons (RE7)") then return end
     local dlc = in_dlc()
     local weapons, ammo = dlc and DLC_WEAPONS or WEAPONS, dlc and DLC_AMMO or AMMO
     imgui.text((dlc and "Not a Hero: Chris's weapons. " or "Main game: Ethan's weapons. ")

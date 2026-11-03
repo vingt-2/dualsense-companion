@@ -61,7 +61,7 @@ def _run(ready):
 
 def window(title, min_width=520):
     w = tk.Toplevel(root)
-    w.title(f"DualSense Bridge – {title}")
+    w.title(f"DualSense Companion – {title}")
     w.configure(bg=SURFACE)
     w.minsize(int(min_width * scale), 0)
     return w

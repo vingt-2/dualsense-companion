@@ -104,7 +104,7 @@ class UsbIpServer:
         busnum, devnum = (int(x) for x in self.device.busid.split("-"))
         return struct.pack(
             ">256s32sIIIHHHBBBBBB",
-            b"/sys/devices/dualsense-bridge", self.device.busid.encode(),
+            b"/sys/devices/dualsense-companion", self.device.busid.encode(),
             busnum, devnum, USB_SPEED_FULL,
             i["vid"], i["pid"], i["bcd"], i["cls"], i["subcls"], i["proto"],
             1, 1, len(self.device.interfaces()),

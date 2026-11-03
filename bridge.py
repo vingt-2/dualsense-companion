@@ -1,7 +1,7 @@
 """DualSense Bluetooth -> wired USB bridge.
 
 Usage:
-    python bridge.py            # start the bridge, then: usbip attach -r 127.0.0.1 -b 1-1
+    python bridge.py            # start the app, then: usbip attach -r 127.0.0.1 -b 1-1
 """
 import ctypes
 import threading

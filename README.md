@@ -1,4 +1,4 @@
-# DualSense Bridge
+# DualSense Companion
 
 > **AI-assisted:** this project was written with [Claude](https://www.anthropic.com/claude) (Anthropic) in Claude Code.
 > The code is AI-written; it was tested by a human on real hardware and in games. Review it as you see fit.
@@ -7,10 +7,13 @@ Use a **PS5 DualSense over Bluetooth** on Windows and have games treat it as a *
 including **HD haptics, adaptive triggers**, rumble, lightbar and LEDs.
 
 Many PC games only enable the DualSense's special features when the controller is plugged in with a cable.
-DualSense Bridge sits in the notification tray and presents your Bluetooth controller to Windows as a
+DualSense Companion sits in the notification tray and presents your Bluetooth controller to Windows as a
 virtual USB DualSense that looks like the real wired one, so those games enable everything.
 
-| Feature | Over Bluetooth with DualSense Bridge |
+> **Formerly DualSense Bridge.** Installed copies update themselves into DualSense Companion and keep
+> their settings, start-with-Windows choice and game mods; the old name's links redirect here.
+
+| Feature | Over Bluetooth with DualSense Companion |
 |---|---|
 | Buttons, sticks, touchpad, motion sensors | ✅ |
 | Rumble | ✅ (works with old and new controller firmware) |
@@ -28,7 +31,7 @@ Tested with Assassin's Creed Mirage on Windows 11. Not affiliated with or endors
 
 1. Pair your DualSense with Windows over Bluetooth (hold **PS + Create** until the lightbar flashes,
    then add it in *Settings → Bluetooth & devices*).
-2. Download **`DualSenseBridge-Setup-<version>.exe`** from the [latest release](https://github.com/vingt-2/dualsense-bridge/releases/latest) and run it.
+2. Download **`DualSenseCompanion-Setup-<version>.exe`** from the [latest release](https://github.com/vingt-2/dualsense-companion/releases/latest) and run it.
 3. Setup also installs two free drivers if you don't have them, by downloading their latest official
    release and opening their own installer:
    - [**usbip-win2**](https://github.com/vadimgrn/usbip-win2): provides the virtual USB port the
@@ -42,7 +45,7 @@ Tested with Assassin's Creed Mirage on Windows 11. Not affiliated with or endors
 
 ## Use
 
-DualSense Bridge runs in the notification tray (it asks for admin rights, which it needs to attach
+DualSense Companion runs in the notification tray (it asks for admin rights, which it needs to attach
 the virtual controller and to configure HidHide). The icon shows the state:
 
 - **Gray**: waiting for the controller to connect over Bluetooth
@@ -108,7 +111,7 @@ Right-click the icon for (top to bottom):
     plays sound sent to the controller (e.g. a game's controller speaker effects).
 - **Hide Bluetooth controller from games** (HidHide), on by default.
 - **Start with Windows**.
-- **Updates**: DualSense Bridge checks GitHub for a new release a minute after it starts and then
+- **Updates**: DualSense Companion checks GitHub for a new release a minute after it starts and then
   once a day, and tells you once per new version. *Update to x.y.z…* then appears at the top of the
   menu: it downloads the new installer, which closes the app, installs and starts the new version.
   Turn off *Check for updates automatically* to stop the checks; *Check now* checks right away.
@@ -116,20 +119,31 @@ Right-click the icon for (top to bottom):
 
 ### Game mods
 
-Many games on PC never got adaptive triggers, but mods add them, and DualSense Bridge plays
+Many games on PC never got adaptive triggers, but mods add them, and DualSense Companion plays
 them on your controller with no other app running.
 
 - **Resident Evil 4 (2023)**: this repository has its own DualSense mod, where guns fire when the
-  trigger wall breaks. Tray menu → *Game mods* → *Resident Evil 4* → *Install the DualSense mod…* sets it
+  trigger wall breaks, each kind of weapon feels as it does on PS5, and the lightbar shows your
+  health as on PS5. Tray menu → *Game mods* → *Resident Evil 4* → *Install the DualSense mod…* sets it
   up in one click (it adds REFramework, the mod loader, if the game doesn't have it). Or by hand:
   [mods/re4-remake](mods/re4-remake/README.md).
-- **Resident Evil 7 biohazard**: the same, for the main game and the DLC episodes, plus
-  PlayStation button prompts instead of the PC version's Xbox ones. Tray menu → *Game mods* →
+- **Resident Evil 7 biohazard**: the same (with Village's PS5 trigger feel), for the main game
+  and the DLC episodes, plus PlayStation button prompts instead of the PC version's Xbox ones. Tray menu → *Game mods* →
   *Resident Evil 7* → *Install the DualSense mod…*, or by hand: [mods/re7](mods/re7/README.md).
+- **Resident Evil 2 and Resident Evil 3** (the remakes): the same (with the RE4 remake's PS5
+  trigger feel), adaptive triggers, the health lightbar and PlayStation button prompts. Tray menu → *Game mods* → the game → *Install the DualSense mod…*,
+  or by hand: [mods/re2](mods/re2/README.md), [mods/re3](mods/re3/README.md).
+- **Resident Evil Village**: the same, in the main game, Shadows of Rose and The Mercenaries.
+  Tray menu → *Game mods* → *Resident Evil Village* → *Install the DualSense mod…*, or by hand:
+  [mods/re8](mods/re8/README.md).
+- **Steam Input:** Resident Evil 7 (like Village, RE2 and RE3) only reads Xbox-style
+  controllers on PC, so keep Steam Input on for it: Steam turns the DualSense into an
+  Xbox-style pad for the game, and the app still drives the triggers and lights. If such a
+  game sees no controller while its mod runs, the app tells you.
 - **Other games** (Skyrim, Fallout 4, RDR2, GTA, …): trigger mods made for DualSenseX work as
   they are. Install the mod as its page says, but skip DualSenseX and any helper app the mod
-  asks you to run: DualSense Bridge takes their place. If DualSenseX is running anyway, the
-  bridge leaves the mods to it.
+  asks you to run: DualSense Companion takes their place. If DualSenseX is running anyway, the
+  app leaves the mods to it.
 
 A mod's effects last until it resets them or its game exits. Nothing from any mod is
 redistributed or changed. Some mods use named trigger presets (*Soft*, *Hard*, *Choppy*, …)
@@ -139,19 +153,23 @@ open an issue.
 ### Troubleshooting
 
 - **The game shows the controller twice, or as a generic controller**: make sure
-  *Hide Bluetooth controller from games* is ticked, and try turning **Steam Input** off for that game.
+  *Hide Bluetooth controller from games* is ticked, and try turning **Steam Input** off for that
+  game. Not for games that only read Xbox-style controllers (Resident Evil 7, Village, RE2,
+  RE3): they need Steam Input on.
+- **A game doesn't react to the controller at all**: it may only read Xbox-style controllers;
+  turn **Steam Input** on for it (Steam → the game's *Properties* → *Controller*).
 - **Something else is wrong**: open the log (tray menu → *Open log*, or
-  `%LOCALAPPDATA%\DualSenseBridge\bridge.log`) and include it in an
-  [issue](https://github.com/vingt-2/dualsense-bridge/issues).
+  `%LOCALAPPDATA%\DualSenseCompanion\companion.log`) and include it in an
+  [issue](https://github.com/vingt-2/dualsense-companion/issues).
 
 ## How it works
 
 ```
-DualSense ──Bluetooth──> DualSense Bridge ──USB/IP (127.0.0.1:3240)──> usbip-win2 virtual USB port ──> Windows & games
+DualSense ──Bluetooth──> DualSense Companion ──USB/IP (127.0.0.1:3240)──> usbip-win2 virtual USB port ──> Windows & games
                          (HidHide hides the Bluetooth controller itself from games)
 ```
 
-The bridge is a small USB/IP server that emulates a wired DualSense: the same USB descriptors
+The app is a small USB/IP server that emulates a wired DualSense: the same USB descriptors
 (including the audio interfaces used for haptics), the same HID reports, and the same feature
 reports, captured from a real controller (see `reference/`). It translates between the wired and
 Bluetooth report formats in both directions:
@@ -173,6 +191,11 @@ These cost some debugging and are documented here in case they help others:
 - **Haptics report layout** comes from [SAxense](https://github.com/egormanga/SAxense) (Linux).
   On Windows the report must be **142 bytes** (the size the controller's Bluetooth descriptor
   declares; Windows sends exactly that), not SAxense's 141, or the CRC lands in the wrong place.
+- **Over Bluetooth the lightbar ignores colours until the host hands it over**: the controller
+  keeps the blue it lights at connect until an output report sets lightbar setup to "light out"
+  (valid flag 2 bit 1, byte 39 of the USB report, and 2 in byte 42), as the Linux driver
+  documents. Games that drive the DualSense themselves send it; games behind Steam Input don't,
+  so the app sends it once per connection, before the first colour.
 - **Byte 5 of the `0x11` control sub-packet is the controller's haptics buffer depth**, roughly in ms.
   SAxense sends `0xFF`, which measured ~200 ms from write to vibration; `0x20` gives ~50 ms end to end,
   `0x08` ~25 ms, and `0x04` plays nothing. (Lead from [AnyPS5 #2056](https://github.com/boykopovar/AnyPS5/issues/2056).)
@@ -201,7 +224,7 @@ These cost some debugging and are documented here in case they help others:
 - Mic packets arrive in the same input report id as the gamepad state, so they must be filtered out
   or they read as stick and button input.
 - **Rumble on newer firmware** (update version ≥ `0x0215`) needs `valid_flag2` bit 2 plus
-  `valid_flag0` bit 1 (haptics select); older firmware uses `valid_flag0` bits 0–1. The bridge reads
+  `valid_flag0` bit 1 (haptics select); older firmware uses `valid_flag0` bits 0–1. The app reads
   the firmware version and rewrites the flags, whichever style the game sent.
 
 ## Build from source
@@ -214,7 +237,7 @@ Requires Windows 10/11 x64, Python 3.10+ and [Inno Setup 6](https://jrsoftware.o
 ```
 
 This runs the self-test (`tests\test_usbip_device.py`, needs no controller or drivers), builds
-`dist\DualSenseBridge.exe` with PyInstaller and the installer `dist\DualSenseBridge-Setup-1.0.0.exe`.
+`dist\DualSenseCompanion.exe` with PyInstaller and the installer `dist\DualSenseCompanion-Setup-1.0.0.exe`.
 
 To run from source instead: `pip install -r requirements.txt`, install usbip-win2 and HidHide, then
 `python tray_app.py` from an elevated terminal.
@@ -234,7 +257,7 @@ To run from source instead: `pip install -r requirements.txt`, install usbip-win
 | `dsx.py` | Game mods: their UDP protocol, trigger effects and payload files |
 | `game_mods.py` | Games with a trigger mod of ours: where it goes, what it conflicts with |
 | `mod_installer.py` | One-click install: finds the game, adds REFramework and the mod |
-| `mods/` | Game scripts that use it (Resident Evil 4 (2023)) |
+| `mods/` | Our game mods: REFramework scripts for Resident Evil 4 (2023), 7, 2, 3 and Village (RE2, RE3 and Village are generated from RE7's by `tools/make_remake_scripts.py`), and the PlayStation button icons |
 | `installer/` | Inno Setup script and the dependency downloader |
 
 ## Credits

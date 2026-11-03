@@ -1,10 +1,11 @@
--- DualSense Bridge: adaptive triggers for Resident Evil 4 (2023)
--- https://github.com/vingt-2/dualsense-bridge (mods/re4-remake)
+-- DualSense Companion: adaptive triggers for Resident Evil 4 (2023)
+-- https://github.com/vingt-2/dualsense-companion (mods/re4-remake)
 --
--- Gives each weapon class its own trigger feel. Guns get a trigger wall that breaks, and the
+-- Gives each weapon class its own trigger feel, and shows the player's health on the
+-- lightbar as on PS5. Guns get a trigger wall that breaks, and the
 -- game only sees R2 once the wall has broken, so the shot fires at the break like a real
--- trigger. Needs REFramework and DualSense Bridge 1.7 or later, which reads the file this
--- script writes (reframework\data\DualSenseBridge\re4_triggers.json) and applies it.
+-- trigger. Needs REFramework and DualSense Companion 1.7 or later, which reads the file this
+-- script writes (reframework\data\DualSenseCompanion\re4_triggers.json) and applies it.
 --
 -- The file uses DSX's instruction format (DualSenseX's mod protocol):
 --   type 1 trigger effect, 2 lightbar, 4 trigger threshold, 7 reset.
@@ -14,12 +15,12 @@
 --
 -- MIT licence, see the repository. Idea: lunati_'s "RE4 Remake Adaptive Triggers" (Nexus).
 
-local OUT_FILE = "DualSenseBridge/re4_triggers.json"   -- relative to reframework/data
-local CONFIG_FILE = "DualSenseBridge/re4_config.json"
+local OUT_FILE = "DualSenseCompanion/re4_triggers.json"   -- relative to reframework/data
+local CONFIG_FILE = "DualSenseCompanion/re4_config.json"
 local POLL = 0.1                                       -- s between checks of the weapon
 
 -- Trigger feel per weapon class. l2/r2 = {mode, params...}; fire = R2 threshold.
--- Tune here, or override any class in reframework/data/DualSenseBridge/re4_config.json.
+-- Tune here, or override any class in reframework/data/DualSenseCompanion/re4_config.json.
 -- Tuned side by side with the PS5 version: aim (L2) is almost free except on launchers, and
 -- the rocket launcher has the strongest wall.
 local PROFILES = {
@@ -37,6 +38,23 @@ local PROFILES = {
 }
 -- A gun with an empty magazine: a light, early click, so the dry fire registers at once.
 local EMPTY_R2 = {22, 2, 4, 3}
+
+-- The lightbar shows the player's health, as on PS5: green while fine, yellow then orange as
+-- it drops (caution), red in danger. Untick it in the menu (or set "lightbar_health": false in
+-- the config) for a colour per weapon class instead.
+local HEALTH_COLOURS = {          -- {above this share of max health, colour}
+    { 0.66, {0, 255, 40} },
+    { 0.45, {255, 200, 0} },
+    { 0.25, {255, 90, 0} },
+    { -1,   {255, 0, 0} },
+}
+
+local function health_colour(ratio)
+    if not ratio then return nil end
+    for _, c in ipairs(HEALTH_COLOURS) do
+        if ratio > c[1] then return c[2] end
+    end
+end
 
 -- Every weapon's class by its ID (main game, Separate Ways and Mercenaries). Classes as
 -- listed in Advanced Weapon Framework's RE4 weapon data (SilverEzredes).
@@ -63,7 +81,7 @@ local GUNS = { handgun = true, shotgun = true, rifle = true, magnum = true, smg 
 -- Player characters' head objects, which carry their equipment (Leon; add others here).
 local PLAYER_OBJECTS = { "ch0a0z0_head" }
 
-local config = { enabled = true, lightbar = true, profiles = {} }
+local config = { enabled = true, lightbar = true, lightbar_health = true, profiles = {} }
 local state = { weapon = nil, class = "none", ammo = nil, last_text = nil,
                 last_poll = 0, error = nil, wrote = 0 }
 
@@ -96,9 +114,22 @@ local function instruction(kind, params)
     return string.format('{"type":%d,"parameters":[%s]}', kind, table.concat(parts, ","))
 end
 
+-- Everything back to normal: the script is off or being reloaded.
+local function release()
+    return '{"instructions":[' .. instruction(7, {0}) .. ']}'
+end
+
+local function health_rgb()
+    if config.lightbar and config.lightbar_health ~= false then return health_colour(state.health) end
+    return nil
+end
+
 local function payload(class, empty)
-    if class == nil then
-        return '{"instructions":[' .. instruction(7, {0}) .. ']}'
+    if class == nil then                    -- nothing in hand: normal triggers, health still shown
+        local rgb = health_rgb()
+        if not rgb then return release() end
+        return '{"instructions":[' .. instruction(7, {0}) .. "," ..
+            instruction(2, {0, rgb[1], rgb[2], rgb[3]}) .. ']}'
     end
     local p = profile(class)
     local r2 = (empty and GUNS[class]) and EMPTY_R2 or p.r2
@@ -108,8 +139,10 @@ local function payload(class, empty)
         instruction(1, {0, 2, table.unpack(r2)}),
         instruction(4, {0, 2, empty and 0 or (p.fire or 0)}),
     }
-    if config.lightbar and p.rgb then
-        list[#list + 1] = instruction(2, {0, p.rgb[1], p.rgb[2], p.rgb[3]})
+    local rgb = p.rgb
+    if config.lightbar_health ~= false then rgb = health_colour(state.health) end
+    if config.lightbar and rgb then
+        list[#list + 1] = instruction(2, {0, rgb[1], rgb[2], rgb[3]})
     end
     return '{"instructions":[' .. table.concat(list, ",") .. ']}'
 end
@@ -218,7 +251,37 @@ local function class_of(weapon)
     return WEAPON_CLASS[weapon] or FAMILIES[math.floor(weapon / 100)] or "other"
 end
 
+-- -- health -------------------------------------------------------------------------------
+local function component(game_object, type_name)
+    local ok, t = pcall(sdk.typeof, type_name)
+    if not ok or not t then return nil end
+    local ok2, c = pcall(game_object.call, game_object, "getComponent(System.Type)", t)
+    return ok2 and c or nil
+end
+
+-- Share of max health (0-1) from a health object: hit points (current / default) or a damage
+-- controller (health / maxHealth), whichever it has.
+local function health_ratio(obj)
+    if not obj then return nil end
+    for _, pair in ipairs({ { "get_CurrentHitPoint", "get_DefaultHitPoint" },
+                            { "get_health", "get_maxHealth" } }) do
+        local hp, max = tonumber(try_call(obj, pair[1])), tonumber(try_call(obj, pair[2]))
+        if hp and max and max > 0 then return math.max(0, math.min(1, hp / max)) end
+    end
+    return nil
+end
+
+-- The player's hit points: the player context's HitPoint (current / default).
+local function player_health()
+    local manager = sdk.get_managed_singleton("chainsaw.CharacterManager")
+    local context = manager and try_call(manager, "getPlayerContextRef")
+    if not context then return nil, "no player" end
+    local r = health_ratio(try_call(context, "get_HitPoint"))
+    return r, r and "HitPoint" or "no HitPoint"
+end
+
 local function poll()
+    state.health, state.health_via = player_health()
     local equipment, why, via = player_equipment()
     state.stage = why or ("ok via " .. tostring(via))
     if not equipment then
@@ -233,21 +296,22 @@ local function poll()
     write(payload(class, ammo == 0))
 end
 
--- What the script sees, written to reframework/data/DualSenseBridge/re4_status.txt when
+-- What the script sees, written to reframework/data/DualSenseCompanion/re4_status.txt when
 -- it changes (and shown in the menu), for troubleshooting from outside the game.
 local last_report
 local function report()
-    local line = string.format("player: %s | weapon: %s (%s) | ammo: %s (%s) | error: %s",
+    local line = string.format("player: %s | weapon: %s (%s) | ammo: %s (%s) | health: %s (%s) | error: %s",
         tostring(state.stage), tostring(state.weapon), state.class, tostring(state.ammo),
-        tostring(state.ammo_via), tostring(state.error))
+        tostring(state.ammo_via), tostring(state.health), tostring(state.health_via),
+        tostring(state.error))
     if line == last_report then return end
     last_report = line
-    local f = io.open("DualSenseBridge/re4_status.txt", "wb")
+    local f = io.open("DualSenseCompanion/re4_status.txt", "wb")
     if f then
         f:write(os.date("%H:%M:%S ") .. line .. "\n")
         f:close()
     end
-    if state.error then log.info("[DualSense Bridge] " .. line) end
+    if state.error then log.info("[DualSense Companion] " .. line) end
 end
 
 -- -- REFramework hooks --------------------------------------------------------------------
@@ -258,7 +322,7 @@ re.on_frame(function()
     if now - state.last_poll < POLL then return end
     state.last_poll = now
     if not config.enabled then
-        write(payload(nil))
+        write(release())
         return
     end
     local ok, err = pcall(poll)
@@ -268,19 +332,29 @@ end)
 
 re.on_script_reset(function()
     state.last_text = nil
-    write(payload(nil))
+    write(release())
 end)
 
 re.on_draw_ui(function()
-    if not imgui.tree_node("DualSense Bridge: adaptive triggers") then return end
+    if not imgui.tree_node("DualSense-Companion") then return end
     local changed
     changed, config.enabled = imgui.checkbox("Enabled", config.enabled)
     if changed then save_config() end
-    changed, config.lightbar = imgui.checkbox("Lightbar colour per weapon", config.lightbar)
+    changed, config.lightbar = imgui.checkbox("Lightbar", config.lightbar)
     if changed then
         state.last_text = nil
         save_config()
     end
+    local health_on = config.lightbar_health ~= false
+    changed, health_on = imgui.checkbox("Lightbar shows health, as on PS5 (off: colour per weapon)",
+        health_on)
+    if changed then
+        config.lightbar_health = health_on
+        state.last_text = nil
+        save_config()
+    end
+    imgui.text("Health: " .. (state.health and string.format("%d%%", math.floor(state.health * 100 + 0.5))
+        or tostring(state.health_via)))
     imgui.text(string.format("Weapon: %s (%s)", state.weapon and ("wp" .. state.weapon) or "none",
         state.class))
     if GUNS[state.class] then

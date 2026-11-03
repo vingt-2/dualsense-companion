@@ -1,8 +1,8 @@
 """Update check: compares this build's version with the latest GitHub release, and
 downloads and runs the new installer when asked.
 
-The installer closes the running app itself (DualSenseBridge.exe --quit, see
-installer/DualSenseBridge.iss) and, run with /SILENT /LAUNCH=1, starts the new one.
+The installer closes the running app itself (DualSenseCompanion.exe --quit, see
+installer/DualSenseCompanion.iss) and, run with /SILENT /LAUNCH=1, starts the new one.
 """
 import json
 import os
@@ -12,9 +12,12 @@ import tempfile
 import urllib.request
 from dataclasses import dataclass
 
-REPO = "vingt-2/dualsense-bridge"
+REPO = "vingt-2/dualsense-companion"
 LATEST = f"https://api.github.com/repos/{REPO}/releases/latest"
-ASSET = re.compile(r"^DualSenseBridge-Setup-[\d.]+\.exe$")
+ASSET = re.compile(r"^DualSenseCompanion-Setup-[\d.]+\.exe$")
+# Releases also carry the installer as DualSenseBridge-Setup-<version>.exe, the only name
+# DualSense Bridge (before the rename) looks for: GitHub redirects the old repo's API to
+# this one, so those copies update themselves into DualSense Companion.
 
 try:
     from _build_version import VERSION   # written by build.ps1
@@ -37,7 +40,7 @@ def parse(version):
 def latest():
     """The latest published release, or None if it has no installer attached."""
     req = urllib.request.Request(LATEST, headers={"Accept": "application/vnd.github+json",
-                                                  "User-Agent": "DualSenseBridge"})
+                                                  "User-Agent": "DualSenseCompanion"})
     with urllib.request.urlopen(req, timeout=15) as r:
         data = json.load(r)
     asset = next((a for a in data.get("assets", []) if ASSET.match(a["name"])), None)
@@ -53,9 +56,9 @@ def newer(release):
 
 def download(release):
     """Download the installer to a temp folder and return its path."""
-    folder = tempfile.mkdtemp(prefix="DualSenseBridge-update-")
-    path = os.path.join(folder, f"DualSenseBridge-Setup-{release.version}.exe")
-    req = urllib.request.Request(release.installer, headers={"User-Agent": "DualSenseBridge"})
+    folder = tempfile.mkdtemp(prefix="DualSenseCompanion-update-")
+    path = os.path.join(folder, f"DualSenseCompanion-Setup-{release.version}.exe")
+    req = urllib.request.Request(release.installer, headers={"User-Agent": "DualSenseCompanion"})
     with urllib.request.urlopen(req, timeout=60) as r, open(path, "wb") as f:
         while chunk := r.read(1 << 16):
             f.write(chunk)
@@ -73,7 +76,7 @@ def install(path):
     The frozen app runs inside a job object (PyInstaller's one-file launcher) that kills
     whatever it started once it exits, and the installer has to close the app. So start
     the installer outside the job where Windows allows it; the installer also moves itself
-    out of the job when it can't (see InitializeSetup in installer/DualSenseBridge.iss)."""
+    out of the job when it can't (see InitializeSetup in installer/DualSenseCompanion.iss)."""
     cmd = [path, "/SILENT", "/SUPPRESSMSGBOXES", "/LAUNCH=1"]
     try:
         subprocess.Popen(cmd, close_fds=True, creationflags=CREATE_BREAKAWAY_FROM_JOB)

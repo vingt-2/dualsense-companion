@@ -1,7 +1,7 @@
 """Installs a game's DualSense mod (see game_mods.py): REFramework from its GitHub
 releases if the game doesn't have it yet, then our script from this repository.
 
-Nothing is deleted: a conflicting mod is moved into DualSenseBridge-backup in the game folder.
+Nothing is deleted: a conflicting mod is moved into DualSenseCompanion-backup in the game folder.
 """
 import io
 import json
@@ -13,7 +13,7 @@ import urllib.request
 import winreg
 import zipfile
 
-UA = {"User-Agent": "DualSenseBridge"}
+UA = {"User-Agent": "DualSenseCompanion"}
 TIMEOUT = 30
 
 
@@ -147,13 +147,54 @@ REFRAMEWORK_FILES = ["dinput8.dll", REFRAMEWORK_CONFIG, "re2_framework_log.txt",
                      "reframework_loose_files.txt"]
 
 
+# -- the rename (DualSense Bridge -> DualSense Companion) ------------------------------------
+def migrate(game, folder, log=print):
+    """Move a mod installed under the old name over to the new one: the data folder (config,
+    REFramework marker, stashed icons) and the script, which keeps working as it was (only its
+    data path changes) until the next update. Returns what was done."""
+    done = []
+    old_data = os.path.join(folder, game["legacy_data"]) if game.get("legacy_data") else None
+    new_data = os.path.join(folder, game["data"])
+    if old_data and os.path.isdir(old_data):
+        if not os.path.exists(new_data):
+            os.makedirs(os.path.dirname(new_data), exist_ok=True)
+            os.rename(old_data, new_data)
+        else:                               # both: keep the new files, add the old ones
+            for src in _files_under(old_data):
+                dst = os.path.join(new_data, os.path.relpath(src, old_data))
+                if not os.path.exists(dst):
+                    os.makedirs(os.path.dirname(dst), exist_ok=True)
+                    shutil.move(src, dst)
+            shutil.rmtree(old_data, ignore_errors=True)
+        done.append("moved its data folder")
+    for old_rel, new_rel in game.get("legacy_files", {}).items():
+        old = os.path.join(folder, old_rel)
+        if not os.path.exists(old):
+            continue
+        new = os.path.join(folder, new_rel)
+        if not os.path.exists(new):
+            with open(old, "rb") as f:
+                script = f.read().replace(b"DualSenseBridge/", b"DualSenseCompanion/")
+            _write(new, script)
+        os.remove(old)
+        done.append(f"renamed {os.path.basename(old)}")
+    if done:
+        log(f"[mods] {game['name']}: moved to the new name: " + "; ".join(done))
+    return done
+
+
 def install(game, folder, get=_get, reframework=latest_reframework, log=print):
     """Install the game's mod into folder. Returns a list of what was done.
 
     Everything is downloaded first, so a failed download leaves the game folder untouched."""
     done = []
+    branch = steam_branch(folder, game["steam_appid"]) if game.get("steam_appid") else None
+    skip = (set(game.get("while_app_runs", []))
+            if branch and branch in game.get("icons_skip_branches", []) else set())
     files = {}
     for rel, url in game["files"].items():
+        if rel in skip:
+            continue
         data = get(url)
         if not data.strip():
             raise RuntimeError(f"empty download: {url}")
@@ -172,6 +213,7 @@ def install(game, folder, get=_get, reframework=latest_reframework, log=print):
             loader_data = z.read(name)
 
     # all downloaded: now change the game folder
+    migrate(game, folder, log)          # an install from before the rename: one script, not two
     if loader_data is not None:
         _write(loader, loader_data)
         # remember that REFramework came from us, so uninstalling may take it away again
@@ -181,7 +223,7 @@ def install(game, folder, get=_get, reframework=latest_reframework, log=print):
         done.append("REFramework already installed")
 
     moved = []
-    backup = os.path.join(folder, "DualSenseBridge-backup", time.strftime("%Y%m%d-%H%M%S"))
+    backup = os.path.join(folder, "DualSenseCompanion-backup", time.strftime("%Y%m%d-%H%M%S"))
     for rel in game.get("conflicts", []):
         src = os.path.join(folder, rel)
         if os.path.exists(src):
@@ -198,11 +240,15 @@ def install(game, folder, get=_get, reframework=latest_reframework, log=print):
     # for the mod, not to look at REFramework. Mods with loose files (button icons under
     # natives\) also need its loose file loader.
     settings = dict(QUIET_MENU)
-    if game.get("loose_files"):
+    if game.get("loose_files") and not skip:
         settings.update(LOOSE_FILES)
     set_config(os.path.join(folder, REFRAMEWORK_CONFIG), settings)
     for rel, data in files.items():
-        _write(os.path.join(folder, rel), data)
+        if rel in game.get("while_app_runs", []):
+            _write(_stashed(game, folder, rel), data)     # put in place by activate()
+        else:
+            _write(os.path.join(folder, rel), data)
+    activate(game, folder)              # installing from the tray: the app is running
     done.append("installed the mod")
     log(f"[mods] {game['name']}: " + "; ".join(done))
     return done
@@ -229,7 +275,8 @@ def _files_under(path):
 
 def other_reframework_mods(game, folder):
     """Files of other REFramework scripts or plugins in the game (they need REFramework)."""
-    ours = {os.path.normcase(os.path.join(folder, rel)) for rel in game["files"]}
+    ours = {os.path.normcase(os.path.join(folder, rel))
+            for rel in list(game["files"]) + list(game.get("legacy_files", {}))}
     found = []
     for sub in ("autorun", "plugins"):
         for f in _files_under(os.path.join(folder, "reframework", sub)):
@@ -242,10 +289,55 @@ def reframework_is_ours(game, folder):
     return os.path.exists(os.path.join(folder, game["data"], REFRAMEWORK_MARKER))
 
 
+# in the mod's data folder: files activate() puts in place (named before the rename; kept so
+# existing installs keep their stash)
+STASH = "while-bridge-runs"
+
+
+def _stashed(game, folder, rel):
+    return os.path.join(folder, game["data"], STASH, rel)
+
+
+def activate(game, folder):
+    """Put the game's while-the-app-runs files (e.g. PlayStation button icons) in place.
+    Returns how many were placed. Only files the mod stashed are touched."""
+    placed = 0
+    for rel in game.get("while_app_runs", []):
+        src = _stashed(game, folder, rel)
+        dst = os.path.join(folder, rel)
+        if not os.path.exists(src) and os.path.exists(dst) and is_installed(game, folder):
+            # installed by 1.7.1, which put the files straight in place: stash them now
+            os.makedirs(os.path.dirname(src), exist_ok=True)
+            shutil.copyfile(dst, src)
+        if os.path.exists(src):
+            dst = os.path.join(folder, rel)
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copyfile(src, dst)
+            placed += 1
+    return placed
+
+
+def deactivate(game, folder):
+    """Take the while-the-app-runs files out again, so the game shows its own (Xbox)
+    icons without the app. Only removes files the mod has a stashed copy of."""
+    removed = 0
+    for rel in game.get("while_app_runs", []):
+        dst = os.path.join(folder, rel)
+        if os.path.exists(_stashed(game, folder, rel)) and os.path.exists(dst):
+            try:
+                os.remove(dst)
+                removed += 1
+            except OSError:
+                pass                       # in use: try again next time
+            _remove_empty_parents(dst, folder)
+    return removed
+
+
 def uninstall(game, folder, log=print):
     """Remove the game's mod; REFramework too if we installed it and nothing else uses it.
-    Backups of other mods (DualSenseBridge-backup) are kept. Returns what was done."""
+    Backups of other mods (DualSenseCompanion-backup) are kept. Returns what was done."""
     done = []
+    migrate(game, folder, log)                      # so the old names go too
     ours = reframework_is_ours(game, folder)        # read before the data folder goes
     remove_loader = ours and not other_reframework_mods(game, folder)
     if remove_loader and os.path.exists(os.path.join(folder, "dinput8.dll")):
@@ -269,7 +361,7 @@ def uninstall(game, folder, log=print):
         root = os.path.join(folder, "reframework")
         if os.path.isdir(root) and not _files_under(root):    # only empty folders left
             shutil.rmtree(root, ignore_errors=True)
-        done.append("removed REFramework (DualSense Bridge had installed it)")
+        done.append("removed REFramework (DualSense Companion had installed it)")
     elif ours:
         done.append("kept REFramework: other mods use it")
     log(f"[mods] {game['name']}: " + "; ".join(done))

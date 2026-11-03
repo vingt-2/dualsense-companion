@@ -2,6 +2,7 @@
 without showing an icon:  python tests\\test_tray_menu.py"""
 import os
 import sys
+import time
 import tempfile
 from types import SimpleNamespace
 
@@ -67,7 +68,7 @@ def main():
     assert "Update the mod… visible=False" in menu, menu
     assert "Uninstall… visible=False" in menu, menu
     os.makedirs(os.path.join(folder, "reframework", "autorun"))
-    open(os.path.join(folder, "reframework", "autorun", "dualsense_bridge_re4.lua"), "w").close()
+    open(os.path.join(folder, "reframework", "autorun", "dualsense_companion_re4.lua"), "w").close()
     menu = "\n".join(walk(app.icon.menu, app.icon))
     assert "DualSense mod installed visible=True" in menu, menu
     assert "Install the DualSense mod… visible=False" in menu, menu
@@ -90,7 +91,54 @@ def main():
     app._check_game(3, exe)
     assert len(notes) == 2 and app.mod_tip is None
     assert tray_app._load_settings()["mod_tips_dismissed"] == ["re4.exe"]
-    print("OK: tray menu builds, the Game mods submenu follows the game's state, reminders until dismissed")
+    # a game that sees no controller for a while gets one notification per launch
+    notes.clear()
+    app.NO_CONTROLLER_GRACE = 0.1
+    app._controller_seen("re7.exe (payload file)", "re7.exe", False)
+    app._controller_seen("re7.exe (payload file)", "re7.exe", False)
+    time.sleep(0.3)
+    assert len(notes) == 1 and "Steam Input" in notes[0], notes
+    app._controller_seen("re7.exe (payload file)", "re7.exe", True)    # seen: all clear
+    app._controller_seen("re7.exe (payload file)", "re7.exe", False)
+    app._controller_seen("re7.exe (payload file)", "re7.exe", True)    # in time: no notice
+    time.sleep(0.3)
+    assert len(notes) == 1, notes
+
+    # quitting takes the icons out; starting (finding games) puts them back
+    import mod_installer
+    re7 = next(g for g in game_mods.GAMES if g["exe"] == "re7.exe")
+    game = tempfile.mkdtemp()
+    stash = os.path.join(game, re7["data"], mod_installer.STASH)
+    for rel in re7["while_app_runs"]:
+        p = os.path.join(stash, rel)
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        open(p, "wb").write(b"icons")
+    app.game_folders = {"re7.exe": game}
+    app._set_mod_files(active=True)
+    placed = os.path.join(game, re7["while_app_runs"][0])
+    assert os.path.exists(placed)
+    app._set_mod_files(active=False)
+    assert not os.path.exists(placed)
+    rename_from_bridge()
+    print("OK: tray menu builds, the Game mods submenu follows the game's state, reminders until dismissed, icons only while running, settings moved over from DualSense Bridge")
+
+
+def rename_from_bridge():
+    """DualSense Bridge's settings folder moves over to DualSense Companion's, once."""
+    base = tempfile.mkdtemp()
+    old, new = os.path.join(base, "DualSenseBridge"), os.path.join(base, "DualSenseCompanion")
+    os.makedirs(old)
+    open(os.path.join(old, "settings.json"), "w").write('{"controller_ids": ["x"]}')
+    open(os.path.join(old, "bridge.log"), "w").write("old log")
+    assert tray_app.migrate_data_dir(old, new)
+    assert open(os.path.join(new, "settings.json")).read() == '{"controller_ids": ["x"]}'
+    assert not os.path.exists(old)
+    assert not tray_app.migrate_data_dir(old, new)            # nothing left to move
+    # new settings already there (e.g. a second start): the old ones never overwrite them
+    os.makedirs(old)
+    open(os.path.join(old, "settings.json"), "w").write("old")
+    assert not tray_app.migrate_data_dir(old, new)
+    assert open(os.path.join(new, "settings.json")).read() == '{"controller_ids": ["x"]}'
 
 
 if __name__ == "__main__":

@@ -44,10 +44,10 @@ def main():
     assert "REFrameworkConfig_RememberMenuState=true" in config
     assert "REFrameworkConfig_MenuOpen=false" in config
     assert not os.path.exists(old)
-    backups = os.listdir(os.path.join(folder, "DualSenseBridge-backup"))
-    assert os.path.exists(os.path.join(folder, "DualSenseBridge-backup", backups[0], "reframework",
+    backups = os.listdir(os.path.join(folder, "DualSenseCompanion-backup"))
+    assert os.path.exists(os.path.join(folder, "DualSenseCompanion-backup", backups[0], "reframework",
                                        "autorun", "DualsenseX", "core.lua"))
-    script = os.path.join(folder, "reframework", "autorun", "dualsense_bridge_re4.lua")
+    script = os.path.join(folder, "reframework", "autorun", "dualsense_companion_re4.lua")
     assert open(script, "rb").read() == b"-- the trigger script"
     assert mod_installer.is_installed(GAME, folder)
 
@@ -83,14 +83,14 @@ def main():
     # uninstall after we installed REFramework: the mod and REFramework go, backups stay
     fresh = tempfile.mkdtemp()
     mod_installer.install(GAME, fresh, get=get, reframework=reframework, log=lambda s: None)
-    data = os.path.join(fresh, "reframework", "data", "DualSenseBridge")
+    data = os.path.join(fresh, "reframework", "data", "DualSenseCompanion")
     open(os.path.join(data, "re4_triggers.json"), "w").close()        # what the script writes
-    os.makedirs(os.path.join(fresh, "DualSenseBridge-backup", "x"))
-    open(os.path.join(fresh, "DualSenseBridge-backup", "x", "old.lua"), "w").close()
+    os.makedirs(os.path.join(fresh, "DualSenseCompanion-backup", "x"))
+    open(os.path.join(fresh, "DualSenseCompanion-backup", "x", "old.lua"), "w").close()
     done = mod_installer.uninstall(GAME, fresh, log=lambda s: None)
     assert done == ["removed the mod",
-                    "removed REFramework (DualSense Bridge had installed it)"], done
-    assert sorted(os.listdir(fresh)) == ["DualSenseBridge-backup"], os.listdir(fresh)
+                    "removed REFramework (DualSense Companion had installed it)"], done
+    assert sorted(os.listdir(fresh)) == ["DualSenseCompanion-backup"], os.listdir(fresh)
 
     # ...but REFramework stays when other scripts use it
     fresh = tempfile.mkdtemp()
@@ -101,7 +101,7 @@ def main():
     assert os.path.exists(os.path.join(fresh, "dinput8.dll"))
     assert not mod_installer.is_installed(GAME, fresh)
 
-    # ...and it's never removed when DualSense Bridge didn't install it
+    # ...and it's never removed when DualSense Companion didn't install it
     fresh = tempfile.mkdtemp()
     open(os.path.join(fresh, "dinput8.dll"), "wb").write(b"theirs")
     mod_installer.install(GAME, fresh, get=get, reframework=reframework, log=lambda s: None)
@@ -150,6 +150,25 @@ def main():
     assert open(icon, "rb").read().endswith(b"/mods/re7/icons/natives/stm/ui/ui0000/tex/ui0010_iam.tex.35.x64")
     config = open(os.path.join(fresh, "re2_fw_config.txt")).read()
     assert "LooseFileLoader_Enabled=true" in config, config
+    # the icons are only in place while the app runs: out at quit, back at the next start
+    assert mod_installer.deactivate(re7, fresh) == 2 and not os.path.exists(icon)
+    assert not os.path.exists(os.path.join(fresh, "natives", "stm", "ui"))   # no empty folders
+    assert mod_installer.activate(re7, fresh) == 2 and os.path.exists(icon)
+    # files the mod didn't stash (e.g. icons copied by hand) are never removed
+    hand = tempfile.mkdtemp()
+    hand_icon = os.path.join(hand, *re7["while_app_runs"][0].split("\\"))
+    os.makedirs(os.path.dirname(hand_icon))
+    open(hand_icon, "wb").write(b"by hand")
+    assert mod_installer.deactivate(re7, hand) == 0 and os.path.exists(hand_icon)
+    # an install from 1.7.1 (icons in place, nothing stashed) is taken over at the next start
+    old = tempfile.mkdtemp()
+    for rel in list(re7["files"]):
+        p = os.path.join(old, rel)
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        open(p, "wb").write(b"1.7.1 copy")
+    assert mod_installer.activate(re7, old) == 2
+    assert mod_installer.deactivate(re7, old) == 2
+    assert not os.path.exists(os.path.join(old, re7["while_app_runs"][0]))
     mod_installer.uninstall(re7, fresh, log=lambda s: None)
     assert not os.path.exists(os.path.join(fresh, "natives", "stm", "ui"))
     assert os.path.exists(os.path.join(fresh, "natives", "stm", "other", "keep.tex"))
@@ -167,6 +186,24 @@ def main():
         pass
     assert os.listdir(fresh) == [], os.listdir(fresh)
 
+    # the old dx11_non-rt build has other icon textures: triggers only, no icons, no loader
+    lib = tempfile.mkdtemp()
+    old_build = os.path.join(lib, "steamapps", "common", "RE7 Folder")
+    os.makedirs(old_build)
+    with open(os.path.join(lib, "steamapps", "appmanifest_418370.acf"), "w") as f:
+        f.write('"AppState"\n{\n\t"appid"\t\t"418370"\n\t"MountedConfig"\n\t{\n'
+                '\t\t"BetaKey"\t\t"dx11_non-rt"\n\t}\n}\n')
+    def reframework_old(asset, repo="praydog/REFramework"):
+        assert asset == "RE7_TDB49.zip", asset
+        return "v9", "https://example.invalid/RE7_TDB49.zip"
+    mod_installer.install(re7, old_build, get=get7, reframework=reframework_old, log=lambda s: None)
+    assert mod_installer.is_installed(re7, old_build)
+    assert not os.path.exists(os.path.join(old_build, "natives"))
+    assert mod_installer.activate(re7, old_build) == 0
+    assert "LooseFileLoader" not in open(os.path.join(old_build, "re2_fw_config.txt")).read()
+
+    rename_from_bridge(get, reframework)
+
     # Steam: the app manifest says where the game is
     lib = tempfile.mkdtemp()
     os.makedirs(os.path.join(lib, "steamapps", "common", "RE4 Folder"))
@@ -175,7 +212,57 @@ def main():
     assert mod_installer.steam_game_folder(2050650, [tempfile.mkdtemp(), lib]) == \
         os.path.join(lib, "steamapps", "common", "RE4 Folder")
     assert mod_installer.steam_game_folder(1, [lib]) is None
-    print("OK: game-mod installer: install, update, uninstall, conflicting mod, Steam lookup all pass")
+    print("OK: game-mod installer: install, update, uninstall, conflicting mod, Steam lookup, "
+          "moving DualSense Bridge installs over all pass")
+
+
+def rename_from_bridge(get, reframework):
+    """A mod installed by DualSense Bridge (before the rename) moves over to the new names."""
+    re7 = next(g for g in game_mods.GAMES if g["exe"] == "re7.exe")
+    folder = tempfile.mkdtemp()
+    old_script = os.path.join(folder, "reframework", "autorun", "dualsense_bridge_re7.lua")
+    old_data = os.path.join(folder, "reframework", "data", "DualSenseBridge")
+    os.makedirs(os.path.dirname(old_script))
+    os.makedirs(os.path.join(old_data, "while-bridge-runs"))
+    open(old_script, "wb").write(b'local OUT_FILE = "DualSenseBridge/re7_triggers.json"\n')
+    open(os.path.join(old_data, "re7_config.json"), "w").write('{"lightbar": false}')
+    open(os.path.join(old_data, "installed-reframework.txt"), "w").write("v8\n")
+    open(os.path.join(old_data, "while-bridge-runs", "icon.tex"), "w").write("icons")
+    assert mod_installer.is_installed(re7, folder)          # not offered again meanwhile
+    assert not mod_installer.other_reframework_mods(re7, folder)   # it's ours, not another mod
+    done = mod_installer.migrate(re7, folder, log=lambda s: None)
+    assert done == ["moved its data folder", "renamed dualsense_bridge_re7.lua"], done
+    new_script = os.path.join(folder, "reframework", "autorun", "dualsense_companion_re7.lua")
+    new_data = os.path.join(folder, "reframework", "data", "DualSenseCompanion")
+    assert not os.path.exists(old_script) and not os.path.exists(old_data)
+    # the old script keeps working as it was, writing where the app now looks
+    assert open(new_script, "rb").read() == b'local OUT_FILE = "DualSenseCompanion/re7_triggers.json"\n'
+    assert open(os.path.join(new_data, "re7_config.json")).read() == '{"lightbar": false}'
+    assert mod_installer.reframework_is_ours(re7, folder)          # the marker came along
+    assert os.path.exists(os.path.join(new_data, "while-bridge-runs", "icon.tex"))
+    assert mod_installer.migrate(re7, folder, log=lambda s: None) == []   # once
+    # a game still writing to the old folder (it was running): merged in, new files kept
+    os.makedirs(old_data)
+    open(os.path.join(old_data, "re7_config.json"), "w").write("stale")
+    open(os.path.join(old_data, "re7_status.txt"), "w").write("status")
+    assert mod_installer.migrate(re7, folder, log=lambda s: None) == ["moved its data folder"]
+    assert open(os.path.join(new_data, "re7_config.json")).read() == '{"lightbar": false}'
+    assert os.path.exists(os.path.join(new_data, "re7_status.txt"))
+    assert not os.path.exists(old_data)
+    # updating over an old install leaves one script, not two
+    open(os.path.join(folder, "dinput8.dll"), "wb").write(b"MZ")   # REFramework is there
+    open(old_script, "wb").write(b"-- old")
+    mod_installer.install(re7, folder, get=get, reframework=reframework, log=lambda s: None)
+    assert not os.path.exists(old_script) and open(new_script, "rb").read() == b"-- the trigger script"
+    # and uninstalling one never updated takes the old names too
+    other = tempfile.mkdtemp()
+    os.makedirs(os.path.join(other, "reframework", "autorun"))
+    open(os.path.join(other, "reframework", "autorun", "dualsense_bridge_re7.lua"), "w").close()
+    os.makedirs(os.path.join(other, "reframework", "data", "DualSenseBridge"))
+    mod_installer.uninstall(re7, other, log=lambda s: None)
+    assert not mod_installer.is_installed(re7, other)
+    assert not os.path.exists(os.path.join(other, "reframework", "data", "DualSenseBridge"))
+    assert not os.path.exists(os.path.join(other, "reframework", "data", "DualSenseCompanion"))
 
 
 if __name__ == "__main__":

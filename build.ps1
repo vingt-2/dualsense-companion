@@ -1,4 +1,4 @@
-# Builds dist\DualSenseBridge.exe and the installer dist\DualSenseBridge-Setup-<version>.exe.
+# Builds dist\DualSenseCompanion.exe and the installer dist\DualSenseCompanion-Setup-<version>.exe.
 # Needs Python 3.10+ and Inno Setup 6 (winget install JRSoftware.InnoSetup).
 param([string] $Version = "1.0.0")
 # Exit codes are checked explicitly: pip and PyInstaller log to stderr, which
@@ -21,6 +21,8 @@ python tests\test_re4_mod.py   # skips unless lupa is installed
 if ($LASTEXITCODE -ne 0) { throw "RE4 script self-test failed" }
 python tests\test_re7_mod.py   # skips unless lupa is installed
 if ($LASTEXITCODE -ne 0) { throw "RE7 script self-test failed" }
+python tests\test_remake_mods.py   # skips unless lupa is installed
+if ($LASTEXITCODE -ne 0) { throw "RE2/RE3 script self-test failed" }
 
 # The version the app reports and compares with GitHub releases (see updater.py)
 Set-Content -Encoding ascii _build_version.py "VERSION = `"$Version`""
@@ -30,14 +32,19 @@ $opusDll = python -c "import importlib.util, os; print(os.path.join(importlib.ut
 if (-not (Test-Path $opusDll)) { throw "opus.dll not found (pip install PyOgg)" }
 
 python -m PyInstaller --noconfirm --onefile --noconsole --uac-admin `
-    --name DualSenseBridge --icon icon.ico --hidden-import pystray._win32 `
+    --name DualSenseCompanion --icon icon.ico --hidden-import pystray._win32 `
     --add-binary "$opusDll;." tray_app.py
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
 
 $iscc = @("$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
           "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $iscc) { throw "Inno Setup 6 not found (winget install JRSoftware.InnoSetup)" }
-& $iscc "/DAppVersion=$Version" installer\DualSenseBridge.iss
+& $iscc "/DAppVersion=$Version" installer\DualSenseCompanion.iss
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
 
-Get-Item dist\DualSenseBridge.exe, "dist\DualSenseBridge-Setup-$Version.exe" | Format-Table Name, Length
+# The same installer under DualSense Bridge's name, the only one its updater looks for
+# (see updater.py): attach both to the GitHub release.
+Copy-Item "dist\DualSenseCompanion-Setup-$Version.exe" "dist\DualSenseBridge-Setup-$Version.exe" -Force
+
+Get-Item dist\DualSenseCompanion.exe, "dist\DualSenseCompanion-Setup-$Version.exe",
+    "dist\DualSenseBridge-Setup-$Version.exe" | Format-Table Name, Length

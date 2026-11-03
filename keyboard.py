@@ -1,6 +1,6 @@
 """Send key presses to Windows as if typed on a keyboard (SendInput).
 
-The bridge runs elevated, so the keys also reach elevated windows and games.
+The app runs elevated, so the keys also reach elevated windows and games.
 """
 import ctypes
 import time
@@ -57,7 +57,7 @@ def key_up(vk):
 
 
 def release_all():
-    """Let go of any key still held down (e.g. Alt, if the bridge quits mid-switch)."""
+    """Let go of any key still held down (e.g. Alt, if the app quits mid-switch)."""
     for vk in list(_down):
         key_up(vk)
 

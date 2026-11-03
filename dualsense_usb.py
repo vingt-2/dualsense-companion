@@ -7,7 +7,7 @@ import time
 import zlib
 from collections import deque
 
-from dsx import Overrides
+from dsx import LIGHTBAR_VALID, VALID1, Overrides
 from haptics import HapticsConverter
 from media import MediaStreamer, MicStream, SpeakerStream, speaker_setup_output
 from usb_audio import AudioFunction
@@ -163,6 +163,21 @@ def normalize_rumble(payload, vibration_v2):
     return bytes(p)
 
 
+# Over Bluetooth the DualSense keeps the blue it lights at connect until the host tells it
+# to fade that out (lightbar setup); only then does it take colours. A PS5 (or the Linux
+# driver) sends this once per connection, before the first colour.
+LIGHTBAR_SETUP_ENABLE, LIGHTBAR_SETUP, LIGHT_OUT = 0x02, 42, 0x02   # valid flag 2 bit; byte
+
+
+def lightbar_setup_output():
+    """USB output report 0x02 that only hands the lightbar over to the host."""
+    r = bytearray(USB_OUTPUT_SIZE)
+    r[0] = 0x02
+    r[1 + VALID_FLAG2] = LIGHTBAR_SETUP_ENABLE
+    r[LIGHTBAR_SETUP] = LIGHT_OUT
+    return bytes(r)
+
+
 def usb_output_to_bt(usb, seq, vibration_v2=True):
     """USB output report 0x02 (48 bytes) -> BT output report 0x31 (78 bytes)."""
     payload = bytes(usb[1:USB_OUTPUT_SIZE]).ljust(47, b"\0")
@@ -206,6 +221,7 @@ class WiredDualSense:
         self.dsx = Overrides(on_change=self._dsx_changed)
         self._game_output = None        # the game's last output report 0x02
         self._mac = (None, "")          # (HID path, MAC) for DSX replies
+        self._lightbar_dev = None       # the connection the lightbar was handed over on
 
     def _speaker_stopped(self):
         history, total, _ = self.bt.link.snapshot()
@@ -234,9 +250,9 @@ class WiredDualSense:
 
     def _load_debug(self):
         """Development knobs, read each time a speaker stream starts so they can be tried
-        without restarting: %LOCALAPPDATA%\\DualSenseBridge\\debug.json, e.g.
+        without restarting: %LOCALAPPDATA%\\DualSenseCompanion\\debug.json, e.g.
         {"speaker_format": 57, "speaker_buffers": [64, 64, 64, 64], "ps5_config": [81, 31, 98, 40]}"""
-        path = os.path.join(os.environ.get("LOCALAPPDATA", "."), "DualSenseBridge", "debug.json")
+        path = os.path.join(os.environ.get("LOCALAPPDATA", "."), "DualSenseCompanion", "debug.json")
         try:
             with open(path, encoding="utf-8") as f:
                 d = json.load(f)
@@ -313,15 +329,23 @@ class WiredDualSense:
         if data and data[0] == 0x02:
             self._log_once("output", f"host sent first output report: {bytes(data[:12]).hex()}")
             self._game_output = bytes(data)
-            self.bt.write_usb_output(self.dsx.patch(data))
+            self._send(self.dsx.patch(data))
 
     # -- DSX mods ---------------------------------------------------------
     def _dsx_changed(self, cleared):
         """A mod changed its effects: send them now rather than at the game's next report.
         When they're all gone, triggers off, then the game's own last state back."""
-        self.bt.write_usb_output(self.dsx.own_report())
+        self._send(self.dsx.own_report())
         if cleared and self._game_output:
-            self.bt.write_usb_output(self.dsx.patch(self._game_output))
+            self._send(self.dsx.patch(self._game_output))
+
+    def _send(self, report):
+        """An output report to the controller; before its first colour on this connection,
+        the lightbar handed over (see lightbar_setup_output)."""
+        if len(report) > VALID1 and report[VALID1] & LIGHTBAR_VALID and                 self._lightbar_dev is not self.bt.dev:
+            self._lightbar_dev = self.bt.dev
+            self.bt.write_usb_output(lightbar_setup_output())
+        self.bt.write_usb_output(report)
 
     def dsx_status(self):
         """What a DSX reply says about the controller."""

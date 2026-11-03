@@ -3,7 +3,7 @@
 ShowCursor() only affects our own windows, so this is the way that works in all apps and
 games (except those that draw their own cursor). An invisible cursor still hovers over
 things, so it can also be parked at the edge of the screen. restore() puts the user's
-cursors back; it runs at startup too, in case the bridge ever exits with them hidden.
+cursors back; it runs at startup too, in case the app ever exits with them hidden.
 """
 import ctypes
 import threading

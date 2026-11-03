@@ -1,4 +1,4 @@
-"""DualSense Bridge tray app.
+"""DualSense Companion tray app.
 
 Runs the BT -> wired bridge in the background and handles the plumbing:
   * attaches the virtual wired controller (usbip-win2) when the DualSense connects,
@@ -37,15 +37,22 @@ from shortcut_window import Shortcut
 from shortcuts import ShortcutEngine, decode
 from usbip_server import UsbIpServer
 
-APP = "DualSense Bridge"
-TASK = "DualSenseBridge"
-DATA_DIR = os.path.join(os.environ.get("LOCALAPPDATA", "."), "DualSenseBridge")
-LOG_PATH = os.path.join(DATA_DIR, "bridge.log")
+APP = "DualSense Companion"
+TASK = "DualSenseCompanion"
+DATA_DIR = os.path.join(os.environ.get("LOCALAPPDATA", "."), "DualSenseCompanion")
+LOG_PATH = os.path.join(DATA_DIR, "companion.log")
 USBIP_URL = "https://github.com/vadimgrn/usbip-win2/releases"
 HIDHIDE_URL = "https://github.com/nefarius/HidHide/releases"
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 SETTINGS_PATH = os.path.join(DATA_DIR, "settings.json")
-QUIT_EVENT = "Local\\DualSenseBridgeQuit"
+QUIT_EVENT = "Local\\DualSenseCompanionQuit"
+
+# Before the rename the app was DualSense Bridge: its settings folder, startup task and exe.
+# The first start of DualSense Companion moves them over (see migrate_from_bridge).
+OLD_DATA_DIR = os.path.join(os.environ.get("LOCALAPPDATA", "."), "DualSenseBridge")
+OLD_TASK = "DualSenseBridge"
+OLD_EXE = os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "DualSense Bridge",
+                       "DualSenseBridge.exe")
 
 # Controller haptics buffer (byte 5 of the BT haptics control packet, ~ms). Smaller is
 # more responsive but has less slack for Bluetooth/PC hiccups. Delays measured via IMU.
@@ -88,6 +95,45 @@ def _find_tool(name, *dirs):
         if os.path.isfile(p):
             return p
     return None
+
+
+def migrate_data_dir(old=OLD_DATA_DIR, new=DATA_DIR):
+    """DualSense Bridge's settings, moved to DualSense Companion's folder once. Returns True
+    if anything was moved."""
+    if not os.path.isdir(old) or os.path.exists(os.path.join(new, "settings.json")):
+        return False
+    try:
+        if not os.path.exists(new):
+            os.rename(old, new)             # settings, log, debug knobs: all of it
+            return True
+    except OSError:
+        pass                                # in use: copy what matters instead
+    os.makedirs(new, exist_ok=True)
+    moved = False
+    for name in ("settings.json", "debug.json"):
+        if os.path.exists(os.path.join(old, name)) and not os.path.exists(os.path.join(new, name)):
+            shutil.copyfile(os.path.join(old, name), os.path.join(new, name))
+            moved = True
+    return moved
+
+
+def _startup_target():
+    return f'"{sys.executable}"' if getattr(sys, "frozen", False) \
+        else f'"{sys.executable}" "{os.path.abspath(__file__)}"'
+
+
+def migrate_startup_task():
+    """DualSense Bridge's start-with-Windows task, replaced by ours (same setting)."""
+    try:
+        if subprocess.run(["schtasks", "/query", "/tn", OLD_TASK], capture_output=True,
+                          timeout=30, creationflags=NO_WINDOW).returncode != 0:
+            return
+    except (OSError, subprocess.TimeoutExpired):
+        return
+    _run("schtasks", "/create", "/tn", TASK, "/tr", _startup_target(),
+         "/sc", "onlogon", "/rl", "highest", "/f")
+    _run("schtasks", "/delete", "/tn", OLD_TASK, "/f")
+    print("[tray] start with Windows: moved over from DualSense Bridge")
 
 
 def _run(*cmd):
@@ -265,7 +311,8 @@ class TrayApp:
         o = self.server.device.dsx
         o.enabled = True
         self._dsx = (dsx.DsxServer(o, self.server.device.dsx_status),
-                     dsx.PayloadWatcher(o, on_process=self._check_game))
+                     dsx.PayloadWatcher(o, on_process=self._check_game,
+                                        on_controller_seen=self._controller_seen))
         for part in self._dsx:
             part.start()
 
@@ -296,7 +343,7 @@ class TrayApp:
         self.icon.update_menu()
         print(f"[mods] {game['name']} is running without its DualSense mod")
         self.icon.notify(f"{game['name']} can have {game['features']} with a free DualSense "
-                         f"mod. Right-click the DualSense Bridge tray icon → Get the DualSense mod "
+                         f"mod. Right-click the DualSense Companion tray icon → Get the DualSense mod "
                          f"for {game['name']}.", APP)
 
     def _dismiss_mod_tip(self):
@@ -306,6 +353,34 @@ class TrayApp:
             _save_settings({"mod_tips_dismissed": sorted(self._tips_dismissed)})
             print(f"[mods] no more reminders for {game['name']}")
         self.icon.update_menu()
+
+    NO_CONTROLLER_GRACE = 2.0     # s the game may see no controller before we say so
+
+    def _controller_seen(self, source, exe, seen):
+        """A mod's script says whether its game sees any controller. These games only read
+        XInput (Xbox-style) pads, so without Steam Input (or another emulator) the DualSense
+        does nothing: tell the user how to fix it, once per game launch."""
+        self._seen_state = getattr(self, "_seen_state", {})
+        key = exe.lower()
+        if seen:
+            self._seen_state[key] = None
+            return
+        if self._seen_state.get(key) is not None:      # already waiting or notified
+            return
+        self._seen_state[key] = time.monotonic()
+        threading.Timer(self.NO_CONTROLLER_GRACE, self._no_controller, args=(key,)).start()
+
+    def _no_controller(self, key):
+        since = self._seen_state.get(key)
+        if since is None or since == "told":
+            return
+        self._seen_state[key] = "told"
+        game = next((g for g in game_mods.GAMES if g["exe"] == key), None)
+        name = game["name"] if game else key
+        print(f"[mods] {name} doesn't see any controller (Steam Input off?)")
+        self.icon.notify(f"{name} doesn't see your DualSense: it only reads Xbox-style "
+                         "controllers. In Steam, turn Steam Input on for it (Properties → "
+                         "Controller); the game picks the controller up right away.", APP)
 
     def _game_mod_items(self):
         items = [pystray.MenuItem("Adaptive triggers and lights from game mods", self._toggle_dsx,
@@ -376,13 +451,13 @@ class TrayApp:
             if not folder or not mod_installer.is_installed(game, folder):
                 return
             if not mod_installer.reframework_is_ours(game, folder):
-                loader = ("  •  REFramework, the mod loader, stays: DualSense Bridge didn't "
+                loader = ("  •  REFramework, the mod loader, stays: DualSense Companion didn't "
                           "install it\n")
             elif mod_installer.other_reframework_mods(game, folder):
                 loader = ("  •  REFramework, the mod loader, stays: other mods in the game "
                           "use it\n")
             else:
-                loader = ("  •  REFramework, the mod loader, is removed too: DualSense Bridge "
+                loader = ("  •  REFramework, the mod loader, is removed too: DualSense Companion "
                           "installed it and nothing else uses it (close the game first)\n")
             if not self._game_closed(game):
                 return
@@ -390,7 +465,7 @@ class TrayApp:
                     f"From {folder}:\n"
                     "  •  the trigger script and its settings are removed\n"
                     + loader +
-                    "  •  anything in DualSenseBridge-backup (e.g. another trigger mod set aside "
+                    "  •  anything in DualSenseCompanion-backup (e.g. another trigger mod set aside "
                     "earlier) stays where it is", 0x04) != 6:
                 return
             mod_installer.uninstall(game, folder)
@@ -417,9 +492,36 @@ class TrayApp:
                     folder = mod_installer.steam_game_folder(game["steam_appid"], libraries)
                     if folder:
                         self.game_folders[game["exe"]] = folder
+            self._migrate_mods()
+            self._set_mod_files(active=True)
             self.icon.update_menu()
         except Exception as e:
             print(f"[mods] looking for games failed: {e}")
+
+    def _migrate_mods(self):
+        """Mods installed under DualSense Bridge's names: moved to ours (mod_installer.migrate)."""
+        for game in game_mods.GAMES:
+            folder = self.game_folders.get(game["exe"])
+            if folder:
+                try:
+                    mod_installer.migrate(game, folder)
+                except Exception as e:
+                    print(f"[mods] {game['name']}: moving to the new name failed: {e}")
+
+    def _set_mod_files(self, active):
+        """Files some mods only want in place while the app runs (PlayStation button icons):
+        in at start, out at quit, so the game shows its own icons when played without it."""
+        for game in game_mods.GAMES:
+            folder = self.game_folders.get(game["exe"])
+            if not (folder and game.get("while_app_runs")):
+                continue
+            try:
+                n = (mod_installer.activate if active else mod_installer.deactivate)(game, folder)
+                if n:
+                    print(f"[mods] {game['name']}: {'put' if active else 'took'} {n} "
+                          f"file(s) {'in place' if active else 'out'} (PlayStation icons)")
+            except Exception as e:
+                print(f"[mods] {game['name']}: icons: {e}")
 
     def _install_mod(self, game):
         if game and not self._installing:
@@ -446,11 +548,13 @@ class TrayApp:
                 f"Into {folder}:\n"
                 "  •  REFramework, the mod loader (from github.com/praydog/REFramework), "
                 "if it isn't installed yet\n"
-                "  •  DualSense Bridge's script (from github.com/vingt-2/dualsense-bridge)\n"
+                "  •  DualSense Companion's script (from github.com/vingt-2/dualsense-companion)\n"
                 + ("  •  PlayStation button icons for the game's prompts, and REFramework's "
                    "loose file loader turned on to load them\n" if game.get("loose_files") else "") +
+                ("  •  keep Steam Input on for this game: it only reads Xbox-style "
+                 "controllers\n" if game.get("xinput_only") else "") +
                 "  •  another adaptive-trigger mod, if there is one, is moved into "
-                "DualSenseBridge-backup, not deleted\n\n"
+                "DualSenseCompanion-backup, not deleted\n\n"
                 "Yes: go ahead.     No: open the step-by-step guide instead.", 0x03)
             if answer == 7:
                 webbrowser.open(game["guide"])
@@ -491,7 +595,7 @@ class TrayApp:
                     self._set_state("wired")
                     self.icon.notify("DualSense is now showing as a wired controller.", APP)
             else:
-                # The controller stays hidden while the bridge runs: un-hiding it here
+                # The controller stays hidden while the app runs: un-hiding it here
                 # let a running game grab it on reconnect, and the game's setup
                 # (feature 0x08 over Bluetooth) knocked it off again, in a loop.
                 self.shortcut_engine.update(frozenset())   # let go of any held shortcut
@@ -537,7 +641,7 @@ class TrayApp:
         action = ACTIONS.get(shortcut.action)
         try:
             if action is None:
-                raise ActionError(f"Unknown action {shortcut.action!r}; is DualSense Bridge up to date?")
+                raise ActionError(f"Unknown action {shortcut.action!r}; is DualSense Companion up to date?")
             if phase == "repeat":
                 return action.repeat(shortcut.params)
             if phase.startswith("press:"):
@@ -634,7 +738,7 @@ class TrayApp:
 
     # -- HidHide --------------------------------------------------------------
     def _hide_ids(self, ids):
-        """Hide these Bluetooth controllers from everything but the bridge."""
+        """Hide these Bluetooth controllers from everything but the app."""
         if not (self.hide_enabled and self.hidhide):
             return
         with self._hide_lock:
@@ -643,6 +747,8 @@ class TrayApp:
                 return
             if not self.hidden_ids:
                 _run(self.hidhide, "--app-reg", sys.executable)
+                if os.path.normcase(sys.executable) != os.path.normcase(OLD_EXE):
+                    _run(self.hidhide, "--app-unreg", OLD_EXE)    # DualSense Bridge's, if any
             for instance_id in new:
                 _run(self.hidhide, "--dev-hide", instance_id)
             _run(self.hidhide, "--cloak-on")
@@ -707,7 +813,7 @@ class TrayApp:
         if not updater.newer(release):
             print(f"[update] up to date ({updater.VERSION})")
             if manual:
-                self.icon.notify(f"DualSense Bridge {updater.VERSION} is up to date.", APP)
+                self.icon.notify(f"DualSense Companion {updater.VERSION} is up to date.", APP)
             return
         self.update = release
         self.icon.update_menu()
@@ -715,7 +821,7 @@ class TrayApp:
         # Tell once per version (or whenever asked), not at every daily check.
         if manual or _load_settings().get("update_notified") != release.version:
             _save_settings({"update_notified": release.version})
-            self.icon.notify(f"DualSense Bridge {release.version} is available. "
+            self.icon.notify(f"DualSense Companion {release.version} is available. "
                              "Right-click the tray icon to update.", APP)
 
     def _install_update(self):
@@ -726,7 +832,7 @@ class TrayApp:
         threading.Thread(target=self._download_and_install, args=(self.update,), daemon=True).start()
 
     def _download_and_install(self, release):
-        self.icon.notify(f"Downloading DualSense Bridge {release.version}…", APP)
+        self.icon.notify(f"Downloading DualSense Companion {release.version}…", APP)
         try:
             path = updater.download(release)
             print(f"[update] installing {release.version} from {path}")
@@ -754,15 +860,14 @@ class TrayApp:
         if self._startup_enabled():
             _run("schtasks", "/delete", "/tn", TASK, "/f")
         else:
-            target = f'"{sys.executable}"' if getattr(sys, "frozen", False) \
-                else f'"{sys.executable}" "{os.path.abspath(__file__)}"'
-            _run("schtasks", "/create", "/tn", TASK, "/tr", target,
+            _run("schtasks", "/create", "/tn", TASK, "/tr", _startup_target(),
                  "/sc", "onlogon", "/rl", "highest", "/f")
         self._startup = None
         self.icon.update_menu()
 
     # -- lifecycle ------------------------------------------------------------
     def _quit(self):
+        self._set_mod_files(active=False)    # the games show their own icons without us
         with self._lock:
             self._detach()
         self._unhide_all()
@@ -774,7 +879,7 @@ class TrayApp:
         os._exit(0)
 
     def _wait_for_quit_request(self):
-        """`DualSenseBridge.exe --quit` (used by the uninstaller) signals this event."""
+        """`DualSenseCompanion.exe --quit` (used by the uninstaller) signals this event."""
         k32 = ctypes.windll.kernel32
         k32.CreateEventW.restype = ctypes.c_void_p
         event = k32.CreateEventW(None, True, False, QUIT_EVENT)
@@ -847,8 +952,12 @@ def main():
     if "--quit" in sys.argv:
         request_quit()
         return
+    moved = migrate_data_dir()
     os.makedirs(DATA_DIR, exist_ok=True)
     sys.stdout = sys.stderr = _Log(LOG_PATH)
+    if moved:
+        print(f"[tray] settings moved over from DualSense Bridge ({OLD_DATA_DIR})")
+    threading.Thread(target=migrate_startup_task, daemon=True).start()
 
     bt = BluetoothDualSense()
     depth = _load_settings().get("haptics_depth")    # see SHOW_HAPTICS_DELAY

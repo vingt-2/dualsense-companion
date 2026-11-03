@@ -135,7 +135,7 @@ def guard_defaults(before, seconds=15, playback_free=None):
     """After the virtual device is attached, put back any default that Windows
     switched away from `before`. Runs for `seconds`, since the sound device
     shows up a little after the USB attach. Once the `playback_free` event is set,
-    playback defaults are left alone (the bridge chose one on purpose)."""
+    playback defaults are left alone (the app chose one on purpose)."""
     restored = set()
     end = time.monotonic() + seconds
     while time.monotonic() < end:
