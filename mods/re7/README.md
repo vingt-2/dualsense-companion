@@ -23,7 +23,7 @@ and only Xbox button prompts.
 
 ## Install
 
-You need [DualSense Companion](../../README.md#install) 1.7.2 or later (for the lightbar; the
+You need [DualSense Companion](../../README.md#install) 1.8 or later (for the lightbar; the
 triggers work from 1.7).
 
 **Keep Steam Input on for Resident Evil 7.** The PC version only reads Xbox-style (XInput)

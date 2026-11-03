@@ -172,7 +172,7 @@ notifications during fullscreen games). The app can't check this itself: Steam I
 game's atlas, map its cells and build it: `tools/ps-icons/README.md`. RE7's atlas:
 `natives/stm/ui/ui0000/tex/ui0010_iam.tex.35.x64` (and an identical `ui0020`), checked in game.
 
-## The rename (DualSense Bridge -> DualSense Companion, 1.7.2)
+## The rename (DualSense Bridge -> DualSense Companion, 1.8.0)
 
 The project was DualSense Bridge until 1.7.1. What carries existing installs over:
 - **Installer** (same `AppId`, so it upgrades): installs into `DualSense Companion`, not the old
@@ -222,7 +222,7 @@ The project was DualSense Bridge until 1.7.1. What carries existing installs ove
   the blue it lights at connect until an output report sets valid flag 2 bit 1 (byte 39 of the
   USB report) with lightbar setup = 2 ("light out", byte 42). Games that drive the DualSense
   themselves (RE4) send it; games behind Steam Input never do, so the app sends it once per
-  connection before the first colour (`WiredDualSense._send`, 1.7.2). The fact is from the
+  connection before the first colour (`WiredDualSense._send`, 1.8.0). The fact is from the
   Linux hid-playstation driver (GPL: fact only).
 - A DSX UDP sender that exits gets its effects released at once (it's treated as the mod's
   process): a test script that sends one packet and quits shows nothing. Keep it running.

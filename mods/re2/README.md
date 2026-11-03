@@ -22,7 +22,7 @@ Xbox button prompts.
 
 ## Install
 
-You need [DualSense Companion](../../README.md#install) 1.7.2 or later.
+You need [DualSense Companion](../../README.md#install) 1.8 or later.
 
 **Keep Steam Input on for Resident Evil 2.** The PC version only reads Xbox-style (XInput)
 controllers. Steam Input reads the DualSense and hands the game an Xbox-style pad, while

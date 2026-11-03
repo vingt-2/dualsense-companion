@@ -6,7 +6,7 @@
 -- lightbar as on PS5. Guns get a trigger wall that breaks, and the
 -- game only sees R2 once the wall has broken, so the shot fires at the break like a real
 -- trigger. Needs REFramework and DualSense
--- Companion 1.7.2 or later (earlier ones can't set the lightbar over Bluetooth when the game
+-- Companion 1.8 or later (earlier ones can't set the lightbar over Bluetooth when the game
 -- runs through Steam Input), which reads the file this script writes
 -- (reframework\data\DualSenseCompanion\re3_triggers.json) and applies it.
 --
