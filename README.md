@@ -200,6 +200,12 @@ These cost some debugging and are documented here in case they help others:
   SAxense sends `0xFF`, which measured ~200 ms from write to vibration; `0x20` gives ~50 ms end to end,
   `0x08` ~25 ms, and `0x04` plays nothing. (Lead from [AnyPS5 #2056](https://github.com/boykopovar/AnyPS5/issues/2056).)
   Latencies were measured with the controller's own IMU, which picks up its vibration.
+- **Haptics cut out when the Bluetooth link stalls longer than that buffer.** Measured with the IMU
+  on a continuous tone: every dropout came with two or three gaps of 20–30 ms between the
+  controller's input reports; with `0x20` that was 4–7 dropouts in 10 s, with `0x40` 0–1 on the
+  same link. The depth can change in the middle of an effect without a glitch (checked going
+  deeper and shallower). An automatic depth (`0x20`, `0x40` while the link stalls) was tried and
+  left out: the owner prefers the lower delay of `0x20`.
 - Reports must be **32 frames**: shorter ones look fine in short bursts but make the controller pulse
   in a continuous stream.
 - Reports must arrive **evenly paced**, which on Python 3.10 needs `timeBeginPeriod(1)` (the default
@@ -208,8 +214,10 @@ These cost some debugging and are documented here in case they help others:
   play stretched to ~2x.
 - After each effect, **keep sending silence for ~250 ms**. Without it short effects (menu clicks)
   never play, or play and then keep vibrating until the next effect.
-- Treat the game's ±1 noise floor as silence (and convert int16 → int8 truncating toward zero),
+- Treat the game's ±1 noise floor as silence (floor division turned it into a constant -1),
   or the haptics stream never stops.
+- **Round int16 → int8 to the nearest step**, not toward zero: truncating made quiet effects
+  10–20 % weaker than on a wired controller (IMU, side by side) and silenced anything under ~1.5 %.
 - The audio endpoints use **`bInterval=1`**. The real controller's `4` makes usbip-win2 never start
   the audio stream.
 - **Speaker and mic over Bluetooth** follow [LinuxAudio4Dualsense5](https://github.com/GeorgLegato/LinuxAudio4Dualsense5)
@@ -225,7 +233,10 @@ These cost some debugging and are documented here in case they help others:
   or they read as stick and button input.
 - **Rumble on newer firmware** (update version ≥ `0x0215`) needs `valid_flag2` bit 2 plus
   `valid_flag0` bit 1 (haptics select); older firmware uses `valid_flag0` bits 0–1. The app reads
-  the firmware version and rewrites the flags, whichever style the game sent.
+  the firmware version and rewrites the flags, whichever style the game sent, but only when the
+  game set haptics select: a report with just an enable bit (Death Stranding sends one on every
+  landing) doesn't rumble a wired controller, while adding haptics select switches the controller
+  to classic rumble and its audio haptics stop until the stream restarts.
 
 ## Build from source
 

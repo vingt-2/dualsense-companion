@@ -22,7 +22,7 @@ BT_HAPTICS_SIZE = 142
 # roughly in ms. SAxense sends 0xFF, which measured ~200 ms from write to vibration;
 # measured with the IMU: 0x08 -> 16 ms, 0x10 -> 31 ms, 0x20 -> 39 ms, 0x40 -> 71 ms,
 # all playing continuous tones unbroken; 0x04 plays nothing. A small buffer has less
-# room for Bluetooth/PC timing hiccups, hence a user setting (tray menu).
+# room for Bluetooth/PC timing hiccups, hence a user setting (tray menu, hidden).
 DEFAULT_DEPTH = 0x20
 
 
@@ -40,6 +40,15 @@ def bt_haptics_report(samples, counter, seq=0, depth=DEFAULT_DEPTH, mic=False):
     body[13:13 + len(samples)] = samples
     crc = zlib.crc32(b"\xa2" + bytes(body)) & 0xFFFFFFFF
     return bytes(body) + struct.pack("<I", crc)
+
+
+def to_int8(v):
+    """Round to the nearest step (half away from zero), within int8. Truncating toward
+    zero (as before 1.8.1) lost 10-20 % of quiet effects, measured with the IMU against a
+    wired controller, and dropped anything under ~1.5 % of full scale. (Floor division was
+    worse: it turned the game's ±1 noise into a constant -1 that never went silent.)"""
+    n = int(abs(v) + 0.5)
+    return max(-128, min(127, n if v >= 0 else -n))
 
 
 class HapticsConverter:
@@ -64,10 +73,8 @@ class HapticsConverter:
             self._acc_r += r
             self._n += 1
             if self._n == DECIMATE:
-                # int() truncates toward zero; floor division turned the game's ±1
-                # noise floor into a constant -1 and the stream never went silent.
-                self._out += struct.pack("bb", int(self._acc_l / (DECIMATE * 256)),
-                                         int(self._acc_r / (DECIMATE * 256)))
+                self._out += struct.pack("bb", to_int8(self._acc_l / (DECIMATE * 256)),
+                                         to_int8(self._acc_r / (DECIMATE * 256)))
                 self._acc_l = self._acc_r = self._n = 0
                 if len(self._out) == FRAMES_PER_REPORT * 2:
                     self._flush()

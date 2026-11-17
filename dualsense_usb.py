@@ -150,10 +150,17 @@ def firmware_uses_vibration_v2(fw_report):
 
 def normalize_rumble(payload, vibration_v2):
     """Rewrite the rumble flag so it matches this controller's firmware,
-    whichever style the game used."""
+    whichever style the game used.
+
+    Only when the game selected classic rumble itself (HAPTICS_SELECT): a report with just
+    an enable bit doesn't rumble a wired controller, which keeps playing audio haptics.
+    Adding HAPTICS_SELECT switched the controller into classic rumble mode and it stayed
+    there: Death Stranding sends motors with only valid_flag0 bit 0 on every landing, and
+    its rain haptics stopped until the next pause (1.8.1)."""
     p = bytearray(payload)
+    if not p[VALID_FLAG0] & HAPTICS_SELECT:
+        return bytes(p)
     if p[VALID_FLAG0] & RUMBLE_V1_BIT or p[VALID_FLAG2] & RUMBLE_V2_BIT:
-        p[VALID_FLAG0] |= HAPTICS_SELECT
         if vibration_v2:
             p[VALID_FLAG0] &= ~RUMBLE_V1_BIT & 0xFF
             p[VALID_FLAG2] |= RUMBLE_V2_BIT

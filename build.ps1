@@ -9,6 +9,8 @@ python -m pip install --quiet --disable-pip-version-check -r requirements.txt
 if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
 python tests\test_usbip_device.py
 if ($LASTEXITCODE -ne 0) { throw "self-test failed" }
+python tests\test_haptics.py
+if ($LASTEXITCODE -ne 0) { throw "haptics self-test failed" }
 python tests\test_shortcuts.py
 if ($LASTEXITCODE -ne 0) { throw "shortcut self-test failed" }
 python tests\test_dsx.py

@@ -199,6 +199,13 @@ The project was DualSense Bridge until 1.7.1. What carries existing installs ove
   since 1.7.0, because the default held up in every game the owner played. It's still in
   `tray_app.py`: set `SHOW_HAPTICS_DELAY = True` to show it again. A `haptics_depth` in
   `settings.json` is applied either way. Bring it back if users report stuttering haptics.
+  An automatic depth (Balanced, Safe while the link stalls) was built and tried in 1.8.1; the
+  owner chose to keep Balanced fixed for its lower delay (it's in git history).
+- **Measuring haptics**: the controller's own accelerometer picks up its vibration. Play tones on
+  channels 3–4 of the controller's audio device (WASAPI, 4 channels) and read the accelerometer
+  from the HID input report (bytes 22–27 of the USB report). That compares a wired controller
+  against the app side by side and finds dropouts. Quit Steam and replug a wired controller
+  first: Steam left it in a mode where it played no audio haptics at all.
 
 ## Pitfalls we hit (don't repeat them)
 
